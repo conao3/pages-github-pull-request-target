@@ -9,7 +9,11 @@ A static GitHub Pages app that lists public repositories whose workflow files co
 - Sorts repositories by star count.
 - Filters by primary language.
 - Shows matching workflow files for each repository.
-- Supports an optional GitHub token stored only in the browser's `localStorage` to raise API rate limits.
+- Supports a GitHub token stored only in the browser's `localStorage` because GitHub requires authentication for code search.
+
+## GitHub token
+
+GitHub's code search REST API returns `401 Requires authentication` without a token. Create a fine-grained token that can read public repositories, paste it into the app, and the app stores it only in your browser's `localStorage`.
 
 ## Development
 

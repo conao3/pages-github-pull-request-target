@@ -187,6 +187,10 @@ function App() {
 
   async function handleSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!token.trim()) {
+      setError('GitHub code search requires authentication. Paste a token to search public workflow files.');
+      return;
+    }
     const controller = new AbortController();
     setLoading(true);
     setError(null);
@@ -214,7 +218,7 @@ function App() {
         <h1>Find repositories using <code>pull_request_target</code></h1>
         <p>
           Search public workflow files, deduplicate repositories, sort by stars, and filter by primary language.
-          Add a GitHub token if you need higher API rate limits.
+          GitHub requires authentication for code search, so add a fine-grained token with public repository read access.
         </p>
       </section>
 
@@ -235,9 +239,10 @@ function App() {
             />
           </label>
           <label>
-            Optional GitHub token
+            GitHub token
             <input
               type="password"
+              required
               placeholder="github_pat_..."
               value={token}
               onChange={(event) => saveToken(event.target.value)}
