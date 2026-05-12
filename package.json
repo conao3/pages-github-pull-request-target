@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "generate:data": "node scripts/generate-data.mjs",
     "build": "tsc -b && vite build",
     "check": "tsc -b --noEmit",
     "preview": "vite preview --host 127.0.0.1"

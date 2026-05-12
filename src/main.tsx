@@ -1,37 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './style.css';
-
-type SearchFile = {
-  name: string;
-  path: string;
-  html_url: string;
-  repository: {
-    full_name: string;
-    html_url: string;
-    description: string | null;
-    stargazers_count?: number;
-    language?: string | null;
-    default_branch?: string;
-  };
-};
-
-type SearchResponse = {
-  total_count: number;
-  incomplete_results: boolean;
-  items: SearchFile[];
-};
-
-type RepoApiResponse = {
-  full_name: string;
-  html_url: string;
-  description: string | null;
-  stargazers_count: number;
-  language: string | null;
-  default_branch: string;
-  pushed_at: string;
-  updated_at: string;
-};
 
 type RepoResult = {
   fullName: string;
@@ -41,109 +10,20 @@ type RepoResult = {
   language: string | null;
   defaultBranch: string;
   pushedAt: string | null;
+  updatedAt: string | null;
   files: Array<{ path: string; url: string }>;
 };
 
-type SortMode = 'stars-desc' | 'stars-asc' | 'name-asc';
+type StaticData = {
+  generatedAt: string | null;
+  query: string;
+  totalCount: number;
+  incompleteResults: boolean;
+  repositoryCount: number;
+  repositories: RepoResult[];
+};
 
-const STORAGE_TOKEN_KEY = 'githubPullRequestTargetFinder.token';
-const DEFAULT_QUERY = 'pull_request_target path:.github/workflows in:file';
-const PAGE_SIZE = 100;
-
-function buildHeaders(token: string): HeadersInit {
-  return {
-    Accept: 'application/vnd.github+json',
-    'X-GitHub-Api-Version': '2022-11-28',
-    ...(token.trim() ? { Authorization: `Bearer ${token.trim()}` } : {}),
-  };
-}
-
-async function githubJson<T>(url: string, token: string, signal: AbortSignal): Promise<T> {
-  const response = await fetch(url, { headers: buildHeaders(token), signal });
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`GitHub API ${response.status}: ${body || response.statusText}`);
-  }
-  return (await response.json()) as T;
-}
-
-async function fetchRepoDetails(fullName: string, token: string, signal: AbortSignal): Promise<RepoApiResponse> {
-  return githubJson<RepoApiResponse>(`https://api.github.com/repos/${fullName}`, token, signal);
-}
-
-async function mapWithConcurrency<T, U>(
-  items: T[],
-  concurrency: number,
-  mapper: (item: T) => Promise<U>,
-): Promise<U[]> {
-  const results: U[] = [];
-  let index = 0;
-
-  async function worker() {
-    while (index < items.length) {
-      const currentIndex = index;
-      index += 1;
-      results[currentIndex] = await mapper(items[currentIndex]);
-    }
-  }
-
-  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
-  return results;
-}
-
-async function searchRepositories(
-  query: string,
-  maxRepositories: number,
-  token: string,
-  signal: AbortSignal,
-): Promise<{ totalCount: number; incomplete: boolean; repos: RepoResult[] }> {
-  const filesByRepo = new Map<string, SearchFile[]>();
-  let totalCount = 0;
-  let incomplete = false;
-  const maxPages = Math.ceil(maxRepositories / PAGE_SIZE);
-
-  for (let page = 1; page <= maxPages; page += 1) {
-    const url = new URL('https://api.github.com/search/code');
-    url.searchParams.set('q', query);
-    url.searchParams.set('per_page', String(PAGE_SIZE));
-    url.searchParams.set('page', String(page));
-
-    const data = await githubJson<SearchResponse>(url.toString(), token, signal);
-    totalCount = data.total_count;
-    incomplete = incomplete || data.incomplete_results;
-
-    for (const item of data.items) {
-      const repoFiles = filesByRepo.get(item.repository.full_name) ?? [];
-      repoFiles.push(item);
-      filesByRepo.set(item.repository.full_name, repoFiles);
-    }
-
-    if (data.items.length < PAGE_SIZE || filesByRepo.size >= maxRepositories) {
-      break;
-    }
-  }
-
-  const selectedRepoNames = Array.from(filesByRepo.keys()).slice(0, maxRepositories);
-  const details = await mapWithConcurrency(selectedRepoNames, 6, (fullName) =>
-    fetchRepoDetails(fullName, token, signal),
-  );
-
-  const repos = details.map((repo) => ({
-    fullName: repo.full_name,
-    url: repo.html_url,
-    description: repo.description,
-    stars: repo.stargazers_count,
-    language: repo.language,
-    defaultBranch: repo.default_branch,
-    pushedAt: repo.pushed_at,
-    files: (filesByRepo.get(repo.full_name) ?? []).map((file) => ({
-      path: file.path,
-      url: file.html_url,
-    })),
-  }));
-
-  return { totalCount, incomplete, repos };
-}
+type SortMode = 'stars-desc' | 'stars-asc' | 'name-asc' | 'updated-desc';
 
 function formatDate(value: string | null) {
   if (!value) return 'unknown';
@@ -151,117 +31,70 @@ function formatDate(value: string | null) {
 }
 
 function App() {
-  const [token, setToken] = useState(() => localStorage.getItem(STORAGE_TOKEN_KEY) ?? '');
-  const [query, setQuery] = useState(DEFAULT_QUERY);
-  const [maxRepositories, setMaxRepositories] = useState(200);
+  const [data, setData] = useState<StaticData | null>(null);
   const [language, setLanguage] = useState('all');
   const [sortMode, setSortMode] = useState<SortMode>('stars-desc');
-  const [loading, setLoading] = useState(false);
+  const [textFilter, setTextFilter] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [totalCount, setTotalCount] = useState<number | null>(null);
-  const [incomplete, setIncomplete] = useState(false);
-  const [repos, setRepos] = useState<RepoResult[]>([]);
+
+  useEffect(() => {
+    fetch(`${import.meta.env.BASE_URL}data/repositories.json`, { cache: 'no-cache' })
+      .then((response) => {
+        if (!response.ok) throw new Error(`Failed to load data: ${response.status}`);
+        return response.json() as Promise<StaticData>;
+      })
+      .then(setData)
+      .catch((caught) => setError(caught instanceof Error ? caught.message : String(caught)));
+  }, []);
+
+  const repositories = data?.repositories ?? [];
 
   const languages = useMemo(() => {
-    const values = new Set(repos.map((repo) => repo.language).filter((value): value is string => Boolean(value)));
+    const values = new Set(repositories.map((repo) => repo.language).filter((value): value is string => Boolean(value)));
     return Array.from(values).sort((a, b) => a.localeCompare(b));
-  }, [repos]);
+  }, [repositories]);
 
   const visibleRepos = useMemo(() => {
-    const filtered = language === 'all' ? repos : repos.filter((repo) => repo.language === language);
+    const normalizedFilter = textFilter.trim().toLowerCase();
+    const filtered = repositories.filter((repo) => {
+      const languageMatches = language === 'all' || repo.language === language;
+      const textMatches =
+        !normalizedFilter ||
+        repo.fullName.toLowerCase().includes(normalizedFilter) ||
+        (repo.description ?? '').toLowerCase().includes(normalizedFilter);
+      return languageMatches && textMatches;
+    });
+
     return [...filtered].sort((a, b) => {
       if (sortMode === 'stars-asc') return a.stars - b.stars;
       if (sortMode === 'name-asc') return a.fullName.localeCompare(b.fullName);
+      if (sortMode === 'updated-desc') {
+        return new Date(b.updatedAt ?? 0).getTime() - new Date(a.updatedAt ?? 0).getTime();
+      }
       return b.stars - a.stars;
     });
-  }, [language, repos, sortMode]);
-
-  function saveToken(nextToken: string) {
-    setToken(nextToken);
-    if (nextToken.trim()) {
-      localStorage.setItem(STORAGE_TOKEN_KEY, nextToken.trim());
-    } else {
-      localStorage.removeItem(STORAGE_TOKEN_KEY);
-    }
-  }
-
-  async function handleSearch(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!token.trim()) {
-      setError('GitHub code search requires authentication. Paste a token to search public workflow files.');
-      return;
-    }
-    const controller = new AbortController();
-    setLoading(true);
-    setError(null);
-    setTotalCount(null);
-    setIncomplete(false);
-    setRepos([]);
-    setLanguage('all');
-
-    try {
-      const result = await searchRepositories(query, maxRepositories, token, controller.signal);
-      setTotalCount(result.totalCount);
-      setIncomplete(result.incomplete);
-      setRepos(result.repos);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught));
-    } finally {
-      setLoading(false);
-    }
-  }
+  }, [language, repositories, sortMode, textFilter]);
 
   return (
     <main className="shell">
       <section className="hero">
         <p className="eyebrow">GitHub Actions security discovery</p>
-        <h1>Find repositories using <code>pull_request_target</code></h1>
+        <h1>Repositories using <code>pull_request_target</code></h1>
         <p>
-          Search public workflow files, deduplicate repositories, sort by stars, and filter by primary language.
-          GitHub requires authentication for code search, so add a fine-grained token with public repository read access.
+          A static index generated by GitHub Actions. Browse repositories whose workflow files contain
+          <code>pull_request_target</code>, sort by stars, and filter by primary language without entering a token.
         </p>
       </section>
 
-      <form className="panel search-form" onSubmit={handleSearch}>
-        <label>
-          GitHub search query
-          <input value={query} onChange={(event) => setQuery(event.target.value)} />
-        </label>
-        <div className="form-grid">
-          <label>
-            Max repositories
-            <input
-              type="number"
-              min="1"
-              max="1000"
-              value={maxRepositories}
-              onChange={(event) => setMaxRepositories(Number(event.target.value))}
-            />
-          </label>
-          <label>
-            GitHub token
-            <input
-              type="password"
-              required
-              placeholder="github_pat_..."
-              value={token}
-              onChange={(event) => saveToken(event.target.value)}
-              autoComplete="off"
-            />
-          </label>
-        </div>
-        <button type="submit" disabled={loading}>{loading ? 'Searching...' : 'Search repositories'}</button>
-      </form>
-
-      {error ? <div className="panel error"><strong>Search failed.</strong><br />{error}</div> : null}
+      {error ? <div className="panel error"><strong>Data load failed.</strong><br />{error}</div> : null}
 
       <section className="panel controls" aria-label="Result controls">
         <div>
-          <span className="stat">{repos.length}</span>
-          <span className="muted"> repositories loaded</span>
+          <span className="stat">{repositories.length}</span>
+          <span className="muted"> repositories indexed</span>
         </div>
         <div>
-          <span className="stat">{totalCount ?? '-'}</span>
+          <span className="stat">{data?.totalCount ?? '-'}</span>
           <span className="muted"> matching files reported by GitHub</span>
         </div>
         <label>
@@ -277,13 +110,24 @@ function App() {
             <option value="stars-desc">Stars: high to low</option>
             <option value="stars-asc">Stars: low to high</option>
             <option value="name-asc">Name: A to Z</option>
+            <option value="updated-desc">Recently updated</option>
           </select>
+        </label>
+        <label className="wide-field">
+          Filter repositories
+          <input
+            placeholder="owner/name or description"
+            value={textFilter}
+            onChange={(event) => setTextFilter(event.target.value)}
+          />
         </label>
       </section>
 
-      {incomplete ? (
-        <p className="notice">GitHub marked the search as incomplete. Try again or narrow the query if results look sparse.</p>
-      ) : null}
+      <section className="panel data-note">
+        <div><strong>Generated:</strong> {data?.generatedAt ? formatDate(data.generatedAt) : 'not generated yet'}</div>
+        <div><strong>Query:</strong> <code>{data?.query ?? 'loading...'}</code></div>
+        {data?.incompleteResults ? <div className="notice">GitHub marked the source search as incomplete.</div> : null}
+      </section>
 
       <section className="results" aria-live="polite">
         {visibleRepos.map((repo) => (

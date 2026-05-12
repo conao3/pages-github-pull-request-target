@@ -4,21 +4,27 @@ A static GitHub Pages app that lists public repositories whose workflow files co
 
 ## Features
 
+- Generates a static repository index in GitHub Actions.
 - Searches GitHub workflow files for `pull_request_target`.
 - Deduplicates results by repository.
 - Sorts repositories by star count.
 - Filters by primary language.
 - Shows matching workflow files for each repository.
-- Supports a GitHub token stored only in the browser's `localStorage` because GitHub requires authentication for code search.
+- Does not ask visitors for a GitHub token.
 
-## GitHub token
+## Data generation
 
-GitHub's code search REST API returns `401 Requires authentication` without a token. Create a fine-grained token that can read public repositories, paste it into the app, and the app stores it only in your browser's `localStorage`.
+The deploy workflow runs `pnpm generate:data` before building the site. The script uses the built-in GitHub Actions token passed as `GITHUB_TOKEN: ${{ github.token }}` and writes `public/data/repositories.json`.
+
+The workflow also runs on a daily schedule so the GitHub Pages artifact is rebuilt with fresh data.
+
+> Note: GitHub's code search API requires authentication. The workflow is intentionally configured to try the standard GitHub Actions token first, so no PAT secret is needed unless GitHub restricts cross-repository code search for `GITHUB_TOKEN` in practice.
 
 ## Development
 
 ```sh
 pnpm install
+GITHUB_TOKEN=$(gh auth token) pnpm generate:data
 pnpm dev
 ```
 
@@ -32,4 +38,4 @@ The Vite base path is configured for GitHub Pages at `/pages-github-pull-request
 
 ## Deployment
 
-The repository includes a GitHub Actions workflow that builds the app and deploys `dist/` to GitHub Pages on pushes to `main`.
+The repository includes a GitHub Actions workflow that generates static data, builds the app, and deploys `dist/` to GitHub Pages on pushes to `main`, on a daily schedule, and through manual dispatch.
