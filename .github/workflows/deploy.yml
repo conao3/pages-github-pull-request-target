@@ -37,7 +37,7 @@ jobs:
         run: pnpm generate:data
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          MAX_REPOSITORIES: 500
+          MAX_SEARCH_RESULTS: 1000
       - name: Build
         run: pnpm build
       - name: Upload artifact

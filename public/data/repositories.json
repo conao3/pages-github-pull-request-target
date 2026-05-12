@@ -24,7 +24,7 @@
     {
       "fullName": "angular/angular",
       "url": "https://github.com/angular/angular",
-      "description": "Deliver web apps with confidence 🚀",
+      "description": "Deliver web apps with confidence \ud83d\ude80",
       "stars": 100086,
       "language": "TypeScript",
       "defaultBranch": "main",
@@ -184,7 +184,7 @@
     {
       "fullName": "kornia/kornia",
       "url": "https://github.com/kornia/kornia",
-      "description": "🐍 Geometric Computer Vision Library for Spatial AI",
+      "description": "\ud83d\udc0d Geometric Computer Vision Library for Spatial AI",
       "stars": 11202,
       "language": "Python",
       "defaultBranch": "main",
@@ -200,7 +200,7 @@
     {
       "fullName": "xonsh/xonsh",
       "url": "https://github.com/xonsh/xonsh",
-      "description": "🐚 Python-powered shell. Full-featured, cross-platform and AI-friendly.",
+      "description": "\ud83d\udc1a Python-powered shell. Full-featured, cross-platform and AI-friendly.",
       "stars": 9334,
       "language": "Python",
       "defaultBranch": "main",
@@ -504,7 +504,7 @@
     {
       "fullName": "reactjs/pt-br.react.dev",
       "url": "https://github.com/reactjs/pt-br.react.dev",
-      "description": "🇧🇷 React documentation website in Portuguese (Brazil)",
+      "description": "\ud83c\udde7\ud83c\uddf7 React documentation website in Portuguese (Brazil)",
       "stars": 536,
       "language": "TypeScript",
       "defaultBranch": "main",
@@ -652,7 +652,7 @@
     {
       "fullName": "wireapp/wire-ios",
       "url": "https://github.com/wireapp/wire-ios",
-      "description": "📱 Wire for iOS (iPhone and iPad)",
+      "description": "\ud83d\udcf1 Wire for iOS (iPhone and iPad)",
       "stars": 142,
       "language": "Swift",
       "defaultBranch": "develop",
@@ -668,7 +668,7 @@
     {
       "fullName": "Azure/sql-action",
       "url": "https://github.com/Azure/sql-action",
-      "description": "🚀 Deploy changes to your SQL database easily with SQL projects or SQL scripts and sql-action for GitHub workflows",
+      "description": "\ud83d\ude80 Deploy changes to your SQL database easily with SQL projects or SQL scripts and sql-action for GitHub workflows",
       "stars": 134,
       "language": "TypeScript",
       "defaultBranch": "master",
@@ -3037,5 +3037,8 @@
         }
       ]
     }
-  ]
+  ],
+  "retrievedFileCount": 200,
+  "searchResultLimit": 1000,
+  "searchResultLimitReached": true
 }

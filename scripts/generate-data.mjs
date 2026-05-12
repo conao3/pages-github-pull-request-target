@@ -2,7 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 
 const token = process.env.GITHUB_TOKEN;
 const query = process.env.SEARCH_QUERY ?? 'pull_request_target path:.github/workflows in:file';
-const maxRepositories = Number(process.env.MAX_REPOSITORIES ?? '500');
+const maxSearchResults = Number(process.env.MAX_SEARCH_RESULTS ?? '1000');
 const outputPath = process.env.OUTPUT_PATH ?? 'public/data/repositories.json';
 const pageSize = 100;
 
@@ -48,7 +48,7 @@ async function main() {
   const filesByRepo = new Map();
   let totalCount = 0;
   let incompleteResults = false;
-  const maxPages = Math.min(10, Math.ceil(maxRepositories / pageSize));
+  const maxPages = Math.min(10, Math.ceil(maxSearchResults / pageSize));
 
   for (let page = 1; page <= maxPages; page += 1) {
     const url = new URL('https://api.github.com/search/code');
@@ -69,12 +69,12 @@ async function main() {
 
     console.log(`Fetched page ${page}: ${filesByRepo.size} repositories`);
 
-    if ((data.items ?? []).length < pageSize || filesByRepo.size >= maxRepositories) {
+    if ((data.items ?? []).length < pageSize || page * pageSize >= maxSearchResults) {
       break;
     }
   }
 
-  const repoNames = Array.from(filesByRepo.keys()).slice(0, maxRepositories);
+  const repoNames = Array.from(filesByRepo.keys());
   const repoDetails = await mapWithConcurrency(repoNames, 8, async (fullName) => {
     const repo = await githubJson(`https://api.github.com/repos/${fullName}`);
     return {
@@ -97,6 +97,9 @@ async function main() {
     query,
     totalCount,
     incompleteResults,
+    retrievedFileCount: Array.from(filesByRepo.values()).reduce((sum, files) => sum + files.length, 0),
+    searchResultLimit: 1000,
+    searchResultLimitReached: totalCount > Array.from(filesByRepo.values()).reduce((sum, files) => sum + files.length, 0),
     repositoryCount: repoDetails.length,
     repositories: repoDetails,
   };
