@@ -52,10 +52,10 @@ function formatNumber(value: number | undefined) {
 
 function MetricCard({ label, value, description, icon }: MetricCardProps) {
   return (
-    <Card className="border-white/10 bg-white/[0.04] shadow-2xl shadow-black/20 backdrop-blur-xl">
-      <CardContent className="flex items-start gap-4 p-5">
-        <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-3 text-cyan-200">{icon}</div>
-        <div>
+    <Card className="min-w-0 border-white/10 bg-white/[0.04] shadow-2xl shadow-black/20 backdrop-blur-xl">
+      <CardContent className="flex min-w-0 items-start gap-3 p-4 sm:gap-4 sm:p-5">
+        <div className="shrink-0 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-3 text-cyan-200">{icon}</div>
+        <div className="min-w-0">
           <p className="text-sm font-medium text-slate-400">{label}</p>
           <p className="mt-1 text-3xl font-semibold tracking-tight text-white">{value}</p>
           <p className="mt-1 text-sm text-slate-500">{description}</p>
@@ -111,25 +111,25 @@ function App() {
   }, [language, repositories, sortMode, textFilter]);
 
   return (
-    <main className="min-h-screen overflow-hidden bg-slate-950 text-slate-50">
-      <div className="pointer-events-none fixed inset-0 -z-10">
-        <div className="absolute left-[-10%] top-[-15%] h-96 w-96 rounded-full bg-cyan-500/20 blur-3xl" />
-        <div className="absolute right-[-5%] top-24 h-[28rem] w-[28rem] rounded-full bg-violet-500/20 blur-3xl" />
-        <div className="absolute bottom-[-20%] left-1/3 h-[30rem] w-[30rem] rounded-full bg-blue-500/10 blur-3xl" />
+    <main className="min-h-screen w-full overflow-x-clip bg-slate-950 text-slate-50">
+      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+        <div className="absolute left-[-10%] top-[-15%] h-80 w-80 rounded-full bg-cyan-500/20 blur-3xl sm:h-96 sm:w-96" />
+        <div className="absolute right-[-35%] top-24 h-80 w-80 rounded-full bg-violet-500/20 blur-3xl sm:right-[-5%] sm:h-[28rem] sm:w-[28rem]" />
+        <div className="absolute bottom-[-20%] left-1/3 h-80 w-80 rounded-full bg-blue-500/10 blur-3xl sm:h-[30rem] sm:w-[30rem]" />
         <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-[size:48px_48px] [mask-image:radial-gradient(ellipse_at_top,black,transparent_70%)]" />
       </div>
 
-      <section className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-4 py-8 sm:px-6 lg:px-8 lg:py-14">
-        <header className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-end">
-          <div className="space-y-6">
+      <section className="mx-auto flex w-full min-w-0 max-w-7xl flex-col gap-8 px-4 py-7 sm:gap-10 sm:px-6 lg:px-8 lg:py-14">
+        <header className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:items-end">
+          <div className="min-w-0 space-y-6">
             <Badge className="w-fit border-cyan-300/20 bg-cyan-300/10 text-cyan-100 hover:bg-cyan-300/10">
               <Sparkles className="mr-1 h-3.5 w-3.5" /> GitHub Actions security discovery
             </Badge>
             <div className="space-y-4">
-              <h1 className="max-w-5xl text-balance text-5xl font-semibold tracking-tight text-white sm:text-6xl lg:text-7xl">
-                Repositories using <span className="bg-gradient-to-r from-cyan-200 via-blue-200 to-violet-200 bg-clip-text text-transparent">pull_request_target</span>
+              <h1 className="max-w-5xl text-balance text-3xl font-semibold leading-tight tracking-tight text-white sm:text-6xl lg:text-7xl">
+                Repositories using <span className="block bg-gradient-to-r from-cyan-200 via-blue-200 to-violet-200 bg-clip-text text-transparent sm:inline">pull_request_target</span>
               </h1>
-              <p className="max-w-2xl text-lg leading-8 text-slate-300">
+              <p className="max-w-2xl text-base leading-7 text-slate-300 sm:text-lg sm:leading-8">
                 A static index generated from GitHub code search. Explore workflow matches, compare repositories by stars, and narrow the set by language without asking visitors for a token.
               </p>
             </div>
@@ -147,21 +147,21 @@ function App() {
             </div>
           </div>
 
-          <Card className="border-white/10 bg-white/[0.04] shadow-2xl shadow-cyan-950/40 backdrop-blur-xl">
-            <CardHeader>
+          <Card className="w-full min-w-0 border-white/10 bg-white/[0.04] shadow-2xl shadow-cyan-950/40 backdrop-blur-xl">
+            <CardHeader className="p-5 sm:p-6">
               <CardTitle className="flex items-center gap-2 text-white">
                 <ShieldAlert className="h-5 w-5 text-cyan-200" /> Index status
               </CardTitle>
               <CardDescription className="text-slate-400">Generated data and search boundaries for this snapshot.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4 text-sm text-slate-300">
+            <CardContent className="space-y-4 p-5 pt-0 text-sm text-slate-300 sm:p-6 sm:pt-0">
               <div className="rounded-lg border border-white/10 bg-slate-950/60 p-3">
                 <div className="text-slate-500">Generated</div>
                 <div className="mt-1 font-medium text-white">{data?.generatedAt ? formatDate(data.generatedAt) : 'not generated yet'}</div>
               </div>
               <div className="rounded-lg border border-white/10 bg-slate-950/60 p-3">
                 <div className="text-slate-500">Query</div>
-                <code className="mt-1 block break-words rounded-md bg-cyan-300/10 px-2 py-1 text-cyan-100">{data?.query ?? 'loading...'}</code>
+                <code className="mt-1 block break-all rounded-md bg-cyan-300/10 px-2 py-1 text-cyan-100">{data?.query ?? 'loading...'}</code>
               </div>
               {data?.searchResultLimitReached ? (
                 <div className="flex gap-3 rounded-lg border border-amber-300/20 bg-amber-300/10 p-3 text-amber-100">
@@ -182,14 +182,14 @@ function App() {
           </Card>
         ) : null}
 
-        <section className="grid gap-4 md:grid-cols-3">
+        <section className="grid min-w-0 gap-4 md:grid-cols-3">
           <MetricCard icon={<GitFork className="h-5 w-5" />} label="Repositories indexed" value={formatNumber(repositories.length)} description="Unique repos in this snapshot" />
           <MetricCard icon={<Code2 className="h-5 w-5" />} label="Matching files reported" value={formatNumber(data?.totalCount)} description="GitHub code search total_count" />
           <MetricCard icon={<FileCode2 className="h-5 w-5" />} label="Files retrieved" value={formatNumber(data?.retrievedFileCount)} description={`Configured limit: ${formatNumber(data?.searchResultLimit)}`} />
         </section>
 
-        <Card className="border-white/10 bg-white/[0.04] shadow-2xl shadow-black/20 backdrop-blur-xl">
-          <CardContent className="grid gap-4 p-5 lg:grid-cols-[1.4fr_0.8fr_0.8fr]">
+        <Card className="min-w-0 border-white/10 bg-white/[0.04] shadow-2xl shadow-black/20 backdrop-blur-xl">
+          <CardContent className="grid min-w-0 gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.8fr)]">
             <label className="grid gap-2 text-sm font-medium text-slate-300">
               Search repositories
               <div className="relative">
@@ -223,8 +223,8 @@ function App() {
           </div>
 
           {visibleRepos.map((repo) => (
-            <Card key={repo.fullName} className="group overflow-hidden border-white/10 bg-white/[0.035] shadow-xl shadow-black/10 backdrop-blur-xl transition duration-200 hover:-translate-y-0.5 hover:border-cyan-300/30 hover:bg-white/[0.055]">
-              <CardHeader className="gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <Card key={repo.fullName} className="group min-w-0 overflow-hidden border-white/10 bg-white/[0.035] shadow-xl shadow-black/10 backdrop-blur-xl transition duration-200 hover:-translate-y-0.5 hover:border-cyan-300/30 hover:bg-white/[0.055]">
+              <CardHeader className="gap-4 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6">
                 <div className="min-w-0 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <a className="break-all text-xl font-semibold tracking-tight text-white underline-offset-4 hover:underline" href={repo.url} target="_blank" rel="noreferrer">
@@ -238,18 +238,18 @@ function App() {
                   <Star className="mr-1 h-3.5 w-3.5 fill-current" /> {repo.stars.toLocaleString()}
                 </Badge>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-lg border border-white/10 bg-slate-950/50 p-3">
+              <CardContent className="space-y-4 p-5 pt-0 sm:p-6 sm:pt-0">
+                <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
+                  <div className="min-w-0 rounded-lg border border-white/10 bg-slate-950/50 p-3">
                     <div className="text-xs uppercase tracking-wide text-slate-500">Language</div>
                     <div className="mt-1 font-medium text-white">{repo.language || 'Unknown'}</div>
                   </div>
-                  <div className="rounded-lg border border-white/10 bg-slate-950/50 p-3">
-                    <div className="flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500"><GitBranch className="h-3.5 w-3.5" /> Default branch</div>
-                    <div className="mt-1 font-medium text-white">{repo.defaultBranch}</div>
+                  <div className="min-w-0 rounded-lg border border-white/10 bg-slate-950/50 p-3">
+                    <div className="flex min-w-0 items-center gap-1 text-xs uppercase tracking-wide text-slate-500"><GitBranch className="h-3.5 w-3.5 shrink-0" /> Default branch</div>
+                    <div className="mt-1 break-words font-medium text-white">{repo.defaultBranch}</div>
                   </div>
-                  <div className="rounded-lg border border-white/10 bg-slate-950/50 p-3">
-                    <div className="flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500"><CalendarClock className="h-3.5 w-3.5" /> Last push</div>
+                  <div className="min-w-0 rounded-lg border border-white/10 bg-slate-950/50 p-3">
+                    <div className="flex min-w-0 items-center gap-1 text-xs uppercase tracking-wide text-slate-500"><CalendarClock className="h-3.5 w-3.5 shrink-0" /> Last push</div>
                     <div className="mt-1 font-medium text-white">{formatDate(repo.pushedAt)}</div>
                   </div>
                 </div>
