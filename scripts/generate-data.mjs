@@ -1,10 +1,31 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 
+const args = new Map();
+for (let index = 2; index < process.argv.length; index += 1) {
+  const arg = process.argv[index];
+  if (arg === '--') continue;
+  if (!arg.startsWith('--')) continue;
+  const [key, inlineValue] = arg.slice(2).split('=', 2);
+  const value = inlineValue ?? process.argv[index + 1];
+  args.set(key, value);
+  if (inlineValue === undefined) index += 1;
+}
+
 const token = process.env.GITHUB_TOKEN;
-const query = process.env.SEARCH_QUERY ?? 'pull_request_target path:.github/workflows in:file';
-const maxSearchResults = Number(process.env.MAX_SEARCH_RESULTS ?? '1000');
+const query = process.env.SEARCH_QUERY ?? 'pull_request_target path:.github/workflows in:file -fork:true';
 const outputPath = process.env.OUTPUT_PATH ?? 'public/data/repositories.json';
 const pageSize = 100;
+const maxSearchResults = process.env.MAX_SEARCH_RESULTS === 'all' ? Number.POSITIVE_INFINITY : Number(process.env.MAX_SEARCH_RESULTS ?? '1000');
+const scanMode = args.get('scan-mode') ?? process.env.SCAN_MODE ?? 'limited';
+const scanMinutes = Number(args.get('minutes') ?? process.env.SCAN_MINUTES ?? '10');
+const retryDelayMs = Number(process.env.RETRY_DELAY_MS ?? '65000');
+const fetchTimeoutMs = Number(process.env.FETCH_TIMEOUT_MS ?? '30000');
+const detailBatchSize = Number(process.env.DETAIL_BATCH_SIZE ?? '100');
+const pageBurstSize = Number(process.env.PAGE_BURST_SIZE ?? '5');
+const maxSearchResultsPerQuery = 1000;
+const rateLimitSafetyMs = Number(process.env.RATE_LIMIT_SAFETY_MS ?? '3500');
+const detailReserveSeconds = Number(process.env.DETAIL_RESERVE_SECONDS ?? '240');
+const buildReserveSeconds = Number(process.env.BUILD_RESERVE_SECONDS ?? '45');
 
 if (!token) {
   throw new Error('GITHUB_TOKEN is required. In GitHub Actions this is provided automatically.');
@@ -19,96 +40,399 @@ function headers() {
   };
 }
 
-async function githubJson(url) {
-  const response = await fetch(url, { headers: headers() });
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`GitHub API ${response.status}: ${body || response.statusText}`);
-  }
-  return await response.json();
+function graphqlHeaders() {
+  return {
+    ...headers(),
+    'Content-Type': 'application/json',
+  };
 }
 
-async function mapWithConcurrency(items, concurrency, mapper) {
-  const results = [];
-  let index = 0;
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
-  async function worker() {
-    while (index < items.length) {
-      const currentIndex = index;
-      index += 1;
-      results[currentIndex] = await mapper(items[currentIndex]);
+async function fetchWithTimeout(url, options = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), fetchTimeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function parseRateLimit(response) {
+  const resetSeconds = Number(response.headers.get('x-ratelimit-reset') ?? '0');
+  return {
+    limit: Number(response.headers.get('x-ratelimit-limit') ?? '0'),
+    remaining: Number(response.headers.get('x-ratelimit-remaining') ?? '0'),
+    resetAt: resetSeconds > 0 ? resetSeconds * 1000 : 0,
+    resource: response.headers.get('x-ratelimit-resource'),
+  };
+}
+
+function resetDelayMs(rateLimit) {
+  if (!rateLimit.resetAt) return retryDelayMs;
+  return Math.max(0, rateLimit.resetAt - Date.now() + rateLimitSafetyMs);
+}
+
+function isRetryableStatus(status) {
+  return status === 403 || status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+}
+
+async function githubJson(url, { retry = 3 } = {}) {
+  for (let attempt = 1; attempt <= retry; attempt += 1) {
+    let response;
+    try {
+      response = await fetchWithTimeout(url, { headers: headers() });
+    } catch (error) {
+      if (attempt < retry) {
+        console.warn(`GitHub API request failed; retrying in ${Math.ceil(retryDelayMs / 1000)}s (${attempt}/${retry}): ${error}`);
+        await sleep(retryDelayMs);
+        continue;
+      }
+      throw error;
     }
+
+    const rateLimit = parseRateLimit(response);
+    if (response.ok) return { data: await response.json(), rateLimit };
+
+    const body = await response.text();
+    const delay = resetDelayMs(rateLimit);
+    if (isRetryableStatus(response.status) && attempt < retry) {
+      console.warn(`GitHub API ${response.status}; retrying in ${Math.ceil(delay / 1000)}s (${attempt}/${retry})`);
+      await sleep(delay);
+      continue;
+    }
+
+    throw new Error(`GitHub API ${response.status}: ${body || response.statusText}`);
   }
 
-  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
-  return results;
+  throw new Error(`GitHub API failed: ${url}`);
+}
+
+async function githubGraphql(document, variables, { retry = 3 } = {}) {
+  for (let attempt = 1; attempt <= retry; attempt += 1) {
+    let response;
+    try {
+      response = await fetchWithTimeout('https://api.github.com/graphql', {
+        method: 'POST',
+        headers: graphqlHeaders(),
+        body: JSON.stringify({ query: document, variables }),
+      });
+    } catch (error) {
+      if (attempt < retry) {
+        console.warn(`GitHub GraphQL request failed; retrying in ${Math.ceil(retryDelayMs / 1000)}s (${attempt}/${retry}): ${error}`);
+        await sleep(retryDelayMs);
+        continue;
+      }
+      throw error;
+    }
+    const body = await response.text();
+
+    if (response.ok) {
+      const payload = JSON.parse(body);
+      if (!payload.errors) return payload.data;
+      if (attempt >= retry) throw new Error(`GitHub GraphQL errors: ${JSON.stringify(payload.errors)}`);
+    } else if (!isRetryableStatus(response.status)) {
+      throw new Error(`GitHub GraphQL ${response.status}: ${body || response.statusText}`);
+    }
+
+    console.warn(`GitHub GraphQL retrying in ${Math.ceil(retryDelayMs / 1000)}s (${attempt}/${retry})`);
+    await sleep(retryDelayMs);
+  }
+
+  throw new Error('GitHub GraphQL failed');
+}
+
+function searchUrl(searchQuery, perPage, page = 1) {
+  const url = new URL('https://api.github.com/search/code');
+  url.searchParams.set('q', searchQuery);
+  url.searchParams.set('per_page', String(perPage));
+  url.searchParams.set('page', String(page));
+  return url.toString();
+}
+
+function addSearchItems(filesByRepo, repoNodes, items) {
+  for (const item of items ?? []) {
+    const repoName = item.repository.full_name;
+    const files = filesByRepo.get(repoName) ?? [];
+    files.push({ path: item.path, url: item.html_url });
+    filesByRepo.set(repoName, files);
+    repoNodes.set(repoName, item.repository.node_id);
+  }
+}
+
+function mergeScan(target, source) {
+  for (const [repoName, files] of source.filesByRepo.entries()) {
+    const existing = target.filesByRepo.get(repoName) ?? [];
+    existing.push(...files);
+    target.filesByRepo.set(repoName, existing);
+  }
+  for (const [repoName, nodeId] of source.repoNodes.entries()) target.repoNodes.set(repoName, nodeId);
+  target.totalCount = Math.max(target.totalCount, source.totalCount);
+  target.incompleteResults = target.incompleteResults || source.incompleteResults;
+  target.searchRequestCount += source.searchRequestCount;
+}
+
+function sizeShards() {
+  const ranges = [
+    [769, 896], [897, 1024], [1025, 1280], [1281, 1536], [1537, 2048],
+    [2049, 3072], [3073, 4096], [4097, 6144], [6145, 8192],
+    [8193, 12288], [12289, 16384], [16385, 32768], [32769, 65536],
+    [513, 544], [545, 576], [577, 640], [641, 704], [705, 768],
+    [385, 400], [401, 416], [417, 432], [433, 448], [449, 464], [465, 480], [481, 496], [497, 512],
+    [0, 128], [129, 192], [193, 224], [225, 256], [257, 272], [273, 288], [289, 304], [305, 320], [321, 336], [337, 352], [353, 368], [369, 384],
+    [65537, 131072], [131073, 262144],
+  ];
+  return ranges.map(([min, max]) => `${query} size:${min}..${max}`).concat(`${query} size:>262144`);
+}
+
+async function fetchSearchPages(searchQuery, maxResults) {
+  const filesByRepo = new Map();
+  const repoNodes = new Map();
+  let totalCount = 0;
+  let incompleteResults = false;
+  let searchRequestCount = 0;
+  const maxPages = Math.min(10, Math.ceil(maxResults / pageSize));
+
+  for (let page = 1; page <= maxPages; page += 1) {
+    const remainingResults = maxResults - (page - 1) * pageSize;
+    const perPage = Math.min(pageSize, remainingResults);
+    const { data } = await githubJson(searchUrl(searchQuery, perPage, page));
+    searchRequestCount += 1;
+    totalCount = data.total_count ?? totalCount;
+    incompleteResults = incompleteResults || Boolean(data.incomplete_results);
+    addSearchItems(filesByRepo, repoNodes, data.items);
+
+    console.log(`Fetched page ${page}: ${filesByRepo.size} repositories`);
+    if ((data.items ?? []).length < perPage || page * pageSize >= maxResults) break;
+  }
+
+  return { filesByRepo, repoNodes, totalCount, incompleteResults, searchRequestCount };
+}
+
+async function waitForSearchBudget(lastRateLimit, neededRequests, deadline) {
+  if (lastRateLimit?.remaining === undefined || lastRateLimit.remaining >= neededRequests) return true;
+
+  const delay = resetDelayMs(lastRateLimit);
+  if (Date.now() + delay >= deadline) return false;
+
+  console.log(`Waiting ${Math.ceil(delay / 1000)}s for code search reset`);
+  await sleep(delay);
+  return true;
+}
+
+async function fetchQueryIntoScan(scan, searchQuery, label, deadline, maxResults = maxSearchResultsPerQuery) {
+  const maxPages = Math.min(10, Math.ceil(maxResults / pageSize));
+  const stat = {
+    label,
+    query: searchQuery,
+    pagesFetched: 0,
+    itemsFetched: 0,
+    repositoriesAfterShard: scan.filesByRepo.size,
+  };
+
+  for (let page = 1; page <= maxPages;) {
+    if (Date.now() >= deadline) break;
+
+    const remainingPages = maxPages - page + 1;
+    const burstSize = Math.min(pageBurstSize, remainingPages);
+    const canContinue = await waitForSearchBudget(scan.lastRateLimit, burstSize, deadline);
+    if (!canContinue) break;
+
+    const burstPages = Array.from({ length: burstSize }, (_, offset) => page + offset)
+      .filter(() => Date.now() < deadline);
+    if (burstPages.length === 0) break;
+
+    const results = await Promise.all(burstPages.map(async (currentPage) => {
+      const remainingResults = maxResults - (currentPage - 1) * pageSize;
+      const perPage = Math.min(pageSize, remainingResults);
+      const { data, rateLimit } = await githubJson(searchUrl(searchQuery, perPage, currentPage));
+      return { currentPage, data, rateLimit };
+    }));
+    scan.searchRequestCount += results.length;
+
+    let shouldStopQuery = false;
+    for (const result of results.sort((a, b) => a.currentPage - b.currentPage)) {
+      scan.lastRateLimit = result.rateLimit;
+      scan.totalCount = Math.max(scan.totalCount, result.data.total_count ?? 0);
+      scan.incompleteResults = scan.incompleteResults || Boolean(result.data.incomplete_results);
+      addSearchItems(scan.filesByRepo, scan.repoNodes, result.data.items);
+      stat.pagesFetched += 1;
+      stat.itemsFetched += result.data.items?.length ?? 0;
+      if ((result.data.items ?? []).length === 0) shouldStopQuery = true;
+    }
+
+    console.log(`${label} pages ${burstPages[0]}-${burstPages.at(-1)}: ${scan.filesByRepo.size} repositories total`);
+    page += burstPages.length;
+    if (shouldStopQuery) break;
+  }
+
+  stat.repositoriesAfterShard = scan.filesByRepo.size;
+  return stat;
+}
+
+async function fetchTimeBudgetScan() {
+  const startedAt = Date.now();
+  const deadline = startedAt + scanMinutes * 60_000;
+  const searchDeadline = deadline - (detailReserveSeconds + buildReserveSeconds) * 1000;
+  const scan = {
+    filesByRepo: new Map(),
+    repoNodes: new Map(),
+    totalCount: 0,
+    incompleteResults: false,
+    searchRequestCount: 0,
+    lastRateLimit: null,
+  };
+  const shardStats = [];
+
+  const effectiveSearchDeadline = searchDeadline > startedAt ? searchDeadline : deadline - buildReserveSeconds * 1000;
+
+  // Best-match first: this preserves high-signal candidates that GitHub ranks near the top
+  // and avoids the previous failure mode where size shards skipped OpenClaw-like repos.
+  const baseStat = await fetchQueryIntoScan(scan, query, 'base-best-match', effectiveSearchDeadline, maxSearchResultsPerQuery);
+  shardStats.push(baseStat);
+
+  // After the first 1,000 best-match results, use size shards only as opportunistic
+  // backfill. These are ordered around typical workflow sizes first, not tiny files first.
+  for (const [shardIndex, shardQuery] of sizeShards().entries()) {
+    if (Date.now() >= effectiveSearchDeadline) break;
+    const before = scan.filesByRepo.size;
+    const stat = await fetchQueryIntoScan(scan, shardQuery, `supplement-size-${shardIndex + 1}`, effectiveSearchDeadline, maxSearchResultsPerQuery);
+    stat.newRepositories = scan.filesByRepo.size - before;
+    shardStats.push(stat);
+  }
+
+  delete scan.lastRateLimit;
+  return {
+    ...scan,
+    shards: shardStats,
+    scanStartedAt: new Date(startedAt).toISOString(),
+    scanElapsedSeconds: Math.round((Date.now() - startedAt) / 1000),
+    scanDeadlineAt: new Date(deadline).toISOString(),
+    searchDeadlineAt: new Date(effectiveSearchDeadline).toISOString(),
+  };
+}
+
+async function fetchLimitedScan() {
+  const result = await fetchSearchPages(query, maxSearchResults);
+  return {
+    ...result,
+    shards: [],
+    scanStartedAt: new Date().toISOString(),
+    scanElapsedSeconds: 0,
+  };
+}
+
+function uniqueFiles(files) {
+  const seen = new Set();
+  return files.filter((file) => {
+    const key = `${file.path}\0${file.url}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+async function fetchRepoDetails(repoNodes, deadline = Number.POSITIVE_INFINITY) {
+  const entries = Array.from(repoNodes.entries());
+  const details = new Map();
+  const document = `
+    query($ids: [ID!]!) {
+      nodes(ids: $ids) {
+        ... on Repository {
+          id
+          nameWithOwner
+          url
+          description
+          stargazerCount
+          primaryLanguage { name }
+          defaultBranchRef { name }
+          pushedAt
+          updatedAt
+          isFork
+        }
+      }
+    }
+  `;
+
+  for (let index = 0; index < entries.length; index += detailBatchSize) {
+    if (Date.now() >= deadline) {
+      console.warn(`Stopping repository detail fetch at ${index}/${entries.length}; time budget exhausted`);
+      break;
+    }
+    const batch = entries.slice(index, index + detailBatchSize);
+    let data;
+    try {
+      data = await githubGraphql(document, { ids: batch.map(([, nodeId]) => nodeId) });
+    } catch (error) {
+      console.warn(`Skipping repository detail batch ${index}-${index + batch.length}: ${error}`);
+      continue;
+    }
+    for (const repo of data.nodes ?? []) {
+      if (!repo || repo.isFork) continue;
+      details.set(repo.nameWithOwner, {
+        fullName: repo.nameWithOwner,
+        url: repo.url,
+        description: repo.description,
+        stars: repo.stargazerCount,
+        language: repo.primaryLanguage?.name ?? null,
+        defaultBranch: repo.defaultBranchRef?.name ?? 'unknown',
+        pushedAt: repo.pushedAt,
+        updatedAt: repo.updatedAt,
+        fork: repo.isFork,
+      });
+    }
+    console.log(`Fetched repository details ${Math.min(index + batch.length, entries.length)}/${entries.length}`);
+    await sleep(500);
+  }
+
+  return details;
 }
 
 async function main() {
-  const filesByRepo = new Map();
-  let totalCount = 0;
-  let incompleteResults = false;
-  const maxPages = Math.min(10, Math.ceil(maxSearchResults / pageSize));
+  const overallStartedAt = Date.now();
+  const overallDeadline = scanMode === 'time-budget' ? overallStartedAt + scanMinutes * 60_000 - buildReserveSeconds * 1000 : Number.POSITIVE_INFINITY;
+  const scan = scanMode === 'time-budget' ? await fetchTimeBudgetScan() : await fetchLimitedScan();
+  const repoDetails = await fetchRepoDetails(scan.repoNodes, overallDeadline);
 
-  for (let page = 1; page <= maxPages; page += 1) {
-    const remainingResults = maxSearchResults - (page - 1) * pageSize;
-    const perPage = Math.min(pageSize, remainingResults);
-    const url = new URL('https://api.github.com/search/code');
-    url.searchParams.set('q', query);
-    url.searchParams.set('per_page', String(perPage));
-    url.searchParams.set('page', String(page));
-
-    const data = await githubJson(url.toString());
-    totalCount = data.total_count;
-    incompleteResults = incompleteResults || data.incomplete_results;
-
-    for (const item of data.items ?? []) {
-      const repoName = item.repository.full_name;
-      const files = filesByRepo.get(repoName) ?? [];
-      files.push({ path: item.path, url: item.html_url });
-      filesByRepo.set(repoName, files);
-    }
-
-    console.log(`Fetched page ${page}: ${filesByRepo.size} repositories`);
-
-    if ((data.items ?? []).length < pageSize || page * pageSize >= maxSearchResults) {
-      break;
-    }
-  }
-
-  const repoNames = Array.from(filesByRepo.keys());
-  const repoDetails = await mapWithConcurrency(repoNames, 8, async (fullName) => {
-    const repo = await githubJson(`https://api.github.com/repos/${fullName}`);
-    return {
-      fullName: repo.full_name,
-      url: repo.html_url,
-      description: repo.description,
-      stars: repo.stargazers_count,
-      language: repo.language,
-      defaultBranch: repo.default_branch,
-      pushedAt: repo.pushed_at,
-      updatedAt: repo.updated_at,
-      files: filesByRepo.get(repo.full_name) ?? [],
-    };
+  const repositories = Array.from(scan.filesByRepo.entries()).flatMap(([fullName, files]) => {
+    const repo = repoDetails.get(fullName);
+    if (!repo) return [];
+    return [{ ...repo, files: uniqueFiles(files).sort((a, b) => a.path.localeCompare(b.path)) }];
   });
 
-  repoDetails.sort((a, b) => b.stars - a.stars || a.fullName.localeCompare(b.fullName));
+  repositories.sort((a, b) => b.stars - a.stars || a.fullName.localeCompare(b.fullName));
 
+  const retrievedFileCount = repositories.reduce((sum, repo) => sum + repo.files.length, 0);
   const payload = {
     generatedAt: new Date().toISOString(),
     query,
-    totalCount,
-    incompleteResults,
-    retrievedFileCount: Array.from(filesByRepo.values()).reduce((sum, files) => sum + files.length, 0),
-    searchResultLimit: maxSearchResults,
-    searchResultLimitReached: totalCount > Array.from(filesByRepo.values()).reduce((sum, files) => sum + files.length, 0),
-    repositoryCount: repoDetails.length,
-    repositories: repoDetails,
+    scanMode,
+    scanMinutesRequested: scanMode === 'time-budget' ? scanMinutes : null,
+    scanStartedAt: scan.scanStartedAt,
+    scanElapsedSeconds: Math.round((Date.now() - overallStartedAt) / 1000),
+    searchElapsedSeconds: scan.scanElapsedSeconds,
+    scanDeadlineAt: scan.scanDeadlineAt,
+    searchDeadlineAt: scan.searchDeadlineAt,
+    totalCount: scan.totalCount,
+    incompleteResults: scan.incompleteResults,
+    retrievedFileCount,
+    searchResultLimit: scanMode === 'time-budget' ? null : maxSearchResults,
+    searchResultLimitReached: scanMode === 'time-budget' ? true : scan.totalCount > retrievedFileCount,
+    searchRequestCount: scan.searchRequestCount,
+    shardCount: scan.shards.length,
+    shardTotalCount: null,
+    cappedShardCount: null,
+    shards: scan.shards,
+    repositoryCount: repositories.length,
+    repositories,
   };
 
   await mkdir(new URL(`../${outputPath.split('/').slice(0, -1).join('/')}/`, import.meta.url), { recursive: true });
   await writeFile(new URL(`../${outputPath}`, import.meta.url), `${JSON.stringify(payload, null, 2)}\n`);
-  console.log(`Wrote ${outputPath} with ${repoDetails.length} repositories`);
+  console.log(`Wrote ${outputPath} with ${repositories.length} repositories`);
 }
 
 await main();

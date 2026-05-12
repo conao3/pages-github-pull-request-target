@@ -26,8 +26,15 @@ type StaticData = {
   totalCount: number;
   incompleteResults: boolean;
   retrievedFileCount?: number;
-  searchResultLimit?: number;
+  searchResultLimit?: number | null;
   searchResultLimitReached?: boolean;
+  scanMode?: string;
+  scanMinutesRequested?: number | null;
+  scanElapsedSeconds?: number;
+  searchRequestCount?: number;
+  shardCount?: number;
+  shardTotalCount?: number | null;
+  cappedShardCount?: number | null;
   repositoryCount: number;
   repositories: RepoResult[];
 };
@@ -46,8 +53,8 @@ function formatDate(value: string | null) {
   return new Intl.DateTimeFormat('en', { dateStyle: 'medium' }).format(new Date(value));
 }
 
-function formatNumber(value: number | undefined) {
-  return value === undefined ? '-' : value.toLocaleString();
+function formatNumber(value: number | null | undefined) {
+  return value === undefined || value === null ? '-' : value.toLocaleString();
 }
 
 function MetricCard({ label, value, description, icon }: MetricCardProps) {
@@ -163,6 +170,14 @@ function App() {
                 <div className="text-slate-500">Query</div>
                 <code className="mt-1 block break-all rounded-md bg-cyan-300/10 px-2 py-1 text-cyan-100">{data?.query ?? 'loading...'}</code>
               </div>
+              <div className="rounded-lg border border-white/10 bg-slate-950/60 p-3">
+                <div className="text-slate-500">Scan mode</div>
+                <div className="mt-1 font-medium text-white">
+                  {data?.scanMode === 'time-budget'
+                    ? `Time budget: ${formatNumber(data.scanMinutesRequested)} min / ${formatNumber(data.searchRequestCount)} search requests`
+                    : data?.scanMode ?? 'loading...'}
+                </div>
+              </div>
               {data?.searchResultLimitReached ? (
                 <div className="flex gap-3 rounded-lg border border-amber-300/20 bg-amber-300/10 p-3 text-amber-100">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -185,7 +200,7 @@ function App() {
         <section className="grid min-w-0 gap-4 md:grid-cols-3">
           <MetricCard icon={<GitFork className="h-5 w-5" />} label="Repositories indexed" value={formatNumber(repositories.length)} description="Unique repos in this snapshot" />
           <MetricCard icon={<Code2 className="h-5 w-5" />} label="Matching files reported" value={formatNumber(data?.totalCount)} description="GitHub code search total_count" />
-          <MetricCard icon={<FileCode2 className="h-5 w-5" />} label="Files retrieved" value={formatNumber(data?.retrievedFileCount)} description={`Configured limit: ${formatNumber(data?.searchResultLimit)}`} />
+          <MetricCard icon={<FileCode2 className="h-5 w-5" />} label="Files retrieved" value={formatNumber(data?.retrievedFileCount)} description={data?.scanMode === 'time-budget' ? `${formatNumber(data.searchRequestCount)} search requests in ${formatNumber(data.scanElapsedSeconds)}s` : `Configured limit: ${formatNumber(data?.searchResultLimit)}`} />
         </section>
 
         <Card className="min-w-0 border-white/10 bg-white/[0.04] shadow-2xl shadow-black/20 backdrop-blur-xl">

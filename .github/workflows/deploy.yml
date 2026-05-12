@@ -38,6 +38,7 @@ jobs:
         run: pnpm generate:data
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          SCAN_MODE: limited
           MAX_SEARCH_RESULTS: 500
       - name: Build
         run: pnpm build

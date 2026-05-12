@@ -6,8 +6,8 @@ A static GitHub Pages app that lists public repositories whose workflow files co
 
 - Generates a static repository index in GitHub Actions.
 - Searches GitHub workflow files for `pull_request_target`.
-- Retrieves the configured first batch of matching code search results, then deduplicates them by repository.
-- Sorts repositories by star count.
+- Supports a local time-budget scan that spends the configured number of minutes on GitHub Code Search requests.
+- Sorts repositories by star count after repository metadata is fetched.
 - Filters by primary language.
 - Shows matching workflow files for each repository.
 - Does not ask visitors for a GitHub token.
@@ -24,16 +24,25 @@ The workflow also runs on a daily schedule so the GitHub Pages artifact is rebui
 
 ## Local data update
 
-Use the local update script when you want to refresh the static index with your own GitHub CLI token instead of the lower-budget GitHub Actions token:
+Use the local update script when you want to refresh the static index with your own GitHub CLI token instead of the lower-budget GitHub Actions token. The script defaults to a 10-minute time-budget scan:
 
 ```sh
 scripts/update-data-local.sh
 ```
 
-By default it reads `GITHUB_TOKEN` from `gh auth token` and requests up to the first 1,000 GitHub code search results. Override the limit when needed:
+Pass the number of minutes as the first argument when needed:
 
 ```sh
-MAX_SEARCH_RESULTS=500 scripts/update-data-local.sh
+scripts/update-data-local.sh 3
+scripts/update-data-local.sh 10
+```
+
+The time-budget scan first fetches the regular GitHub Code Search best-match results up to GitHub's 1,000-result paging limit, then uses file-size shards only as opportunistic backfill if time remains. GitHub Code Search does not support repository-star sorting before retrieval, so star order is applied after metadata is fetched.
+
+For a quick limited scan, use `SCAN_MODE=limited` and `MAX_SEARCH_RESULTS`:
+
+```sh
+SCAN_MODE=limited MAX_SEARCH_RESULTS=500 scripts/update-data-local.sh
 ```
 
 After reviewing the generated JSON, commit and push the updated data:
@@ -48,7 +57,7 @@ git push origin main
 
 ```sh
 pnpm install
-GITHUB_TOKEN=$(gh auth token) pnpm generate:data
+GITHUB_TOKEN=$(gh auth token) SCAN_MODE=limited MAX_SEARCH_RESULTS=100 pnpm generate:data
 pnpm dev
 ```
 
