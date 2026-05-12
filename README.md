@@ -6,7 +6,7 @@ A static GitHub Pages app that lists public repositories whose workflow files co
 
 - Generates a static repository index in GitHub Actions.
 - Searches GitHub workflow files for `pull_request_target`.
-- Retrieves up to the first 1,000 matching code search results, then deduplicates them by repository.
+- Retrieves the configured first batch of matching code search results, then deduplicates them by repository.
 - Sorts repositories by star count.
 - Filters by primary language.
 - Shows matching workflow files for each repository.
@@ -16,7 +16,7 @@ A static GitHub Pages app that lists public repositories whose workflow files co
 
 The deploy workflow runs `pnpm generate:data` before building the site. The script uses the built-in GitHub Actions token passed as `GITHUB_TOKEN: ${{ github.token }}` and writes `public/data/repositories.json`.
 
-GitHub's code search REST API reports the total matching file count, but only allows clients to page through the first 1,000 results for a query. This site therefore shows an indexed subset of repositories from those retrievable results, not a complete GitHub-wide census.
+GitHub's code search REST API reports the total matching file count, but only allows limited paging for a query and the built-in GitHub Actions token has a low search request budget. This site therefore shows an indexed subset of repositories from the retrievable results, not a complete GitHub-wide census.
 
 The workflow also runs on a daily schedule so the GitHub Pages artifact is rebuilt with fresh data.
 

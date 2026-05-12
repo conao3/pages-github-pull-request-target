@@ -98,7 +98,7 @@ async function main() {
     totalCount,
     incompleteResults,
     retrievedFileCount: Array.from(filesByRepo.values()).reduce((sum, files) => sum + files.length, 0),
-    searchResultLimit: 1000,
+    searchResultLimit: maxSearchResults,
     searchResultLimitReached: totalCount > Array.from(filesByRepo.values()).reduce((sum, files) => sum + files.length, 0),
     repositoryCount: repoDetails.length,
     repositories: repoDetails,

@@ -3039,6 +3039,6 @@
     }
   ],
   "retrievedFileCount": 200,
-  "searchResultLimit": 1000,
+  "searchResultLimit": 500,
   "searchResultLimitReached": true
 }
