@@ -22,6 +22,28 @@ The workflow also runs on a daily schedule so the GitHub Pages artifact is rebui
 
 > Note: GitHub's code search API requires authentication. The workflow is intentionally configured to try the standard GitHub Actions token first, so no PAT secret is needed unless GitHub restricts cross-repository code search for `GITHUB_TOKEN` in practice.
 
+## Local data update
+
+Use the local update script when you want to refresh the static index with your own GitHub CLI token instead of the lower-budget GitHub Actions token:
+
+```sh
+scripts/update-data-local.sh
+```
+
+By default it reads `GITHUB_TOKEN` from `gh auth token` and requests up to the first 1,000 GitHub code search results. Override the limit when needed:
+
+```sh
+MAX_SEARCH_RESULTS=500 scripts/update-data-local.sh
+```
+
+After reviewing the generated JSON, commit and push the updated data:
+
+```sh
+git add public/data/repositories.json
+git commit -m "chore: update repository index"
+git push origin main
+```
+
 ## Development
 
 ```sh

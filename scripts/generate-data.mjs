@@ -51,9 +51,11 @@ async function main() {
   const maxPages = Math.min(10, Math.ceil(maxSearchResults / pageSize));
 
   for (let page = 1; page <= maxPages; page += 1) {
+    const remainingResults = maxSearchResults - (page - 1) * pageSize;
+    const perPage = Math.min(pageSize, remainingResults);
     const url = new URL('https://api.github.com/search/code');
     url.searchParams.set('q', query);
-    url.searchParams.set('per_page', String(pageSize));
+    url.searchParams.set('per_page', String(perPage));
     url.searchParams.set('page', String(page));
 
     const data = await githubJson(url.toString());
