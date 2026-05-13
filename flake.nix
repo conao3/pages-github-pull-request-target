@@ -60,5 +60,29 @@
           };
         }
       );
+
+      apps = forAllSystems (
+        { pkgs }:
+        let
+          mkPnpmApp =
+            name: args: {
+              type = "app";
+              program = toString (
+                pkgs.writeShellScript "pnpm-${name}" ''
+                  set -euo pipefail
+                  cd "$(${pkgs.git}/bin/git rev-parse --show-toplevel)"
+                  if [ ! -d node_modules ]; then
+                    ${pkgs.pnpm}/bin/pnpm install --frozen-lockfile
+                  fi
+                  exec ${pkgs.pnpm}/bin/pnpm ${args}
+                ''
+              );
+            };
+        in
+        {
+          check = mkPnpmApp "check" "check";
+          build = mkPnpmApp "build" "build";
+        }
+      );
     };
 }
