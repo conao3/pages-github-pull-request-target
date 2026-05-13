@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { createFileRoute } from '@tanstack/react-router';
 import { AlertTriangle, ArrowUpRight, CalendarClock, Code2, FileCode2, GitBranch, GitFork, Search, ShieldAlert, Sparkles, Star } from 'lucide-react';
@@ -78,24 +78,24 @@ type RepositoryCardProps = {
   repo: RepoResult;
 };
 
-function RepositoryCard({ repo }: RepositoryCardProps) {
+const RepositoryCard = memo(function RepositoryCard({ repo }: RepositoryCardProps) {
   return (
-    <Card className="group min-w-0 overflow-hidden border-white/10 bg-white/[0.035] shadow-xl shadow-black/10 backdrop-blur-xl transition duration-200 hover:-translate-y-0.5 hover:border-cyan-300/30 hover:bg-white/[0.055]">
-      <CardHeader className="gap-4 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6">
+    <Card className="group flex h-full min-w-0 flex-col overflow-hidden border-white/10 bg-white/[0.035] shadow-lg shadow-black/10">
+      <CardHeader className="shrink-0 gap-3 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5">
         <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <a className="break-all text-xl font-semibold tracking-tight text-white underline-offset-4 hover:underline" href={repo.url} target="_blank" rel="noreferrer">
+            <a className="break-all text-lg font-semibold tracking-tight text-white underline-offset-4 hover:underline sm:text-xl" href={repo.url} target="_blank" rel="noreferrer">
               {repo.fullName}
             </a>
-            <ArrowUpRight className="h-4 w-4 text-slate-500 transition group-hover:text-cyan-200" />
+            <ArrowUpRight className="h-4 w-4 text-slate-500 group-hover:text-cyan-200" />
           </div>
-          <CardDescription className="max-w-4xl text-slate-400">{repo.description || 'No description provided.'}</CardDescription>
+          <CardDescription className="line-clamp-2 max-w-4xl text-slate-400">{repo.description || 'No description provided.'}</CardDescription>
         </div>
         <Badge className="w-fit border-amber-300/20 bg-amber-300/10 text-amber-100 hover:bg-amber-300/10">
           <Star className="mr-1 h-3.5 w-3.5 fill-current" /> {repo.stars.toLocaleString()}
         </Badge>
       </CardHeader>
-      <CardContent className="space-y-4 p-5 pt-0 sm:p-6 sm:pt-0">
+      <CardContent className="flex min-h-0 flex-1 flex-col space-y-3 p-4 pt-0 sm:p-5 sm:pt-0">
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
           <div className="min-w-0 rounded-lg border border-white/10 bg-slate-950/50 p-3">
             <div className="text-xs uppercase tracking-wide text-slate-500">Language</div>
@@ -110,7 +110,7 @@ function RepositoryCard({ repo }: RepositoryCardProps) {
             <div className="mt-1 font-medium text-white">{formatDate(repo.pushedAt)}</div>
           </div>
         </div>
-        <details className="rounded-lg border border-white/10 bg-slate-950/40 p-3 text-sm text-slate-300">
+        <details className="h-20 shrink-0 overflow-y-auto rounded-lg border border-white/10 bg-slate-950/40 p-3 text-sm text-slate-300">
           <summary className="cursor-pointer font-medium text-cyan-100">{repo.files.length} matching workflow file{repo.files.length === 1 ? '' : 's'}</summary>
           <ul className="mt-3 grid gap-2">
             {repo.files.map((file) => (
@@ -125,24 +125,56 @@ function RepositoryCard({ repo }: RepositoryCardProps) {
       </CardContent>
     </Card>
   );
-}
+});
 
 type VirtualRepositoryListProps = {
   repositories: RepoResult[];
 };
 
-const VIRTUAL_OVERSCAN = 6;
-const ESTIMATED_ROW_HEIGHT = 356;
+const VIRTUAL_OVERSCAN = 12;
+
+function getEstimatedRowHeight(width: number) {
+  if (width < 640) return 438;
+  if (width < 1024) return 336;
+  return 300;
+}
+
+function useViewportWidth() {
+  const [width, setWidth] = useState(() => (typeof window === 'undefined' ? 1024 : window.innerWidth));
+
+  useEffect(() => {
+    let animationFrame = 0;
+
+    const updateWidth = () => {
+      cancelAnimationFrame(animationFrame);
+      animationFrame = requestAnimationFrame(() => setWidth(window.innerWidth));
+    };
+
+    window.addEventListener('resize', updateWidth);
+    return () => {
+      cancelAnimationFrame(animationFrame);
+      window.removeEventListener('resize', updateWidth);
+    };
+  }, []);
+
+  return width;
+}
 
 function VirtualRepositoryList({ repositories }: VirtualRepositoryListProps) {
   const listRef = useRef<HTMLDivElement | null>(null);
+  const viewportWidth = useViewportWidth();
+  const rowHeight = getEstimatedRowHeight(viewportWidth);
   const rowVirtualizer = useWindowVirtualizer({
     count: repositories.length,
-    estimateSize: () => ESTIMATED_ROW_HEIGHT,
+    estimateSize: () => rowHeight,
     overscan: VIRTUAL_OVERSCAN,
     scrollMargin: listRef.current?.offsetTop ?? 0,
     getItemKey: (index) => repositories[index]?.fullName ?? index,
   });
+
+  useEffect(() => {
+    rowVirtualizer.measure();
+  }, [rowHeight, rowVirtualizer]);
 
   const virtualItems = rowVirtualizer.getVirtualItems();
 
@@ -159,10 +191,12 @@ function VirtualRepositoryList({ repositories }: VirtualRepositoryListProps) {
         return (
           <div
             key={virtualItem.key}
-            ref={rowVirtualizer.measureElement}
             data-index={virtualItem.index}
-            className="absolute inset-x-0 top-0 pb-4"
-            style={{ transform: `translateY(${virtualItem.start - rowVirtualizer.options.scrollMargin}px)` }}
+            className="absolute inset-x-0 top-0 will-change-transform [contain:layout_paint_style]"
+            style={{
+              height: `${rowHeight - 16}px`,
+              transform: `translate3d(0, ${virtualItem.start - rowVirtualizer.options.scrollMargin}px, 0)`,
+            }}
           >
             <RepositoryCard repo={repo} />
           </div>
@@ -311,9 +345,9 @@ function PullRequestTargetPage() {
           </CardContent>
         </Card>
 
-        <section className="grid gap-4" aria-live="polite">
+        <section className="grid gap-4">
           <div className="flex items-center justify-between gap-4">
-            <h2 className="text-xl font-semibold tracking-tight text-white">{visibleRepos.length.toLocaleString()} repositories</h2>
+            <h2 className="text-xl font-semibold tracking-tight text-white" aria-live="polite">{visibleRepos.length.toLocaleString()} repositories</h2>
             <Badge variant="outline" className="border-white/15 bg-white/5 text-slate-300">Live static data</Badge>
           </div>
 
