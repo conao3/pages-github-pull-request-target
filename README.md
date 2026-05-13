@@ -56,7 +56,7 @@ git push origin main
 
 ## Development
 
-The project uses [direnv](https://direnv.net/) + a Nix flake to provision Node.js, pnpm, bun, gh, and wrangler, and to install npm dependencies on entry. From a fresh clone:
+The project uses [nix-direnv](https://github.com/nix-community/nix-direnv) + a Nix flake to provision Node.js, pnpm, bun, gh, and wrangler, and to install npm dependencies on entry. From a fresh clone:
 
 ```sh
 direnv allow .
