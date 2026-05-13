@@ -19,6 +19,8 @@ const maxSearchResults = process.env.MAX_SEARCH_RESULTS === 'all' ? Number.POSIT
 const scanMode = args.get('scan-mode') ?? process.env.SCAN_MODE ?? 'limited';
 const scanMinutes = Number(args.get('minutes') ?? process.env.SCAN_MINUTES ?? '10');
 const retryDelayMs = Number(process.env.RETRY_DELAY_MS ?? '65000');
+const retryAttempts = Number(process.env.RETRY_ATTEMPTS ?? '3');
+const searchDelayMs = Number(process.env.SEARCH_DELAY_MS ?? '0');
 const fetchTimeoutMs = Number(process.env.FETCH_TIMEOUT_MS ?? '30000');
 const detailBatchSize = Number(process.env.DETAIL_BATCH_SIZE ?? '100');
 const pageBurstSize = Number(process.env.PAGE_BURST_SIZE ?? '5');
@@ -80,7 +82,7 @@ function isRetryableStatus(status) {
   return status === 403 || status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
 }
 
-async function githubJson(url, { retry = 3 } = {}) {
+async function githubJson(url, { retry = retryAttempts } = {}) {
   for (let attempt = 1; attempt <= retry; attempt += 1) {
     let response;
     try {
@@ -111,7 +113,7 @@ async function githubJson(url, { retry = 3 } = {}) {
   throw new Error(`GitHub API failed: ${url}`);
 }
 
-async function githubGraphql(document, variables, { retry = 3 } = {}) {
+async function githubGraphql(document, variables, { retry = retryAttempts } = {}) {
   for (let attempt = 1; attempt <= retry; attempt += 1) {
     let response;
     try {
@@ -207,6 +209,7 @@ async function fetchSearchPages(searchQuery, maxResults) {
 
     console.log(`Fetched page ${page}: ${filesByRepo.size} repositories`);
     if ((data.items ?? []).length < perPage || page * pageSize >= maxResults) break;
+    if (searchDelayMs > 0) await sleep(searchDelayMs);
   }
 
   return { filesByRepo, repoNodes, totalCount, incompleteResults, searchRequestCount };

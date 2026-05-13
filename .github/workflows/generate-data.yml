@@ -16,7 +16,7 @@ on:
       max_search_results:
         description: Maximum code search items for limited mode, or 1000/all for time-budget mode
         required: true
-        default: '500'
+        default: '1000'
         type: string
       scan_minutes:
         description: Time budget in minutes when scan_mode is time-budget
@@ -36,8 +36,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SCAN_MODE: ${{ github.event.inputs.scan_mode || 'limited' }}
-      MAX_SEARCH_RESULTS: ${{ github.event.inputs.max_search_results || '500' }}
+      MAX_SEARCH_RESULTS: ${{ github.event.inputs.max_search_results || '1000' }}
       SCAN_MINUTES: ${{ github.event.inputs.scan_minutes || '10' }}
+      SEARCH_DELAY_MS: '65000'
+      RETRY_ATTEMPTS: '5'
       GITHUB_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout

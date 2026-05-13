@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AlertTriangle, ArrowUpRight, CalendarClock, Code2, FileCode2, GitBranch, GitFork, Search, ShieldAlert, Sparkles, Star } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -69,6 +69,113 @@ function MetricCard({ label, value, description, icon }: MetricCardProps) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+
+type RepositoryCardProps = {
+  repo: RepoResult;
+};
+
+function RepositoryCard({ repo }: RepositoryCardProps) {
+  return (
+    <Card className="group min-w-0 overflow-hidden border-white/10 bg-white/[0.035] shadow-xl shadow-black/10 backdrop-blur-xl transition duration-200 hover:-translate-y-0.5 hover:border-cyan-300/30 hover:bg-white/[0.055]">
+      <CardHeader className="gap-4 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6">
+        <div className="min-w-0 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <a className="break-all text-xl font-semibold tracking-tight text-white underline-offset-4 hover:underline" href={repo.url} target="_blank" rel="noreferrer">
+              {repo.fullName}
+            </a>
+            <ArrowUpRight className="h-4 w-4 text-slate-500 transition group-hover:text-cyan-200" />
+          </div>
+          <CardDescription className="max-w-4xl text-slate-400">{repo.description || 'No description provided.'}</CardDescription>
+        </div>
+        <Badge className="w-fit border-amber-300/20 bg-amber-300/10 text-amber-100 hover:bg-amber-300/10">
+          <Star className="mr-1 h-3.5 w-3.5 fill-current" /> {repo.stars.toLocaleString()}
+        </Badge>
+      </CardHeader>
+      <CardContent className="space-y-4 p-5 pt-0 sm:p-6 sm:pt-0">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
+          <div className="min-w-0 rounded-lg border border-white/10 bg-slate-950/50 p-3">
+            <div className="text-xs uppercase tracking-wide text-slate-500">Language</div>
+            <div className="mt-1 font-medium text-white">{repo.language || 'Unknown'}</div>
+          </div>
+          <div className="min-w-0 rounded-lg border border-white/10 bg-slate-950/50 p-3">
+            <div className="flex min-w-0 items-center gap-1 text-xs uppercase tracking-wide text-slate-500"><GitBranch className="h-3.5 w-3.5 shrink-0" /> Default branch</div>
+            <div className="mt-1 break-words font-medium text-white">{repo.defaultBranch}</div>
+          </div>
+          <div className="min-w-0 rounded-lg border border-white/10 bg-slate-950/50 p-3">
+            <div className="flex min-w-0 items-center gap-1 text-xs uppercase tracking-wide text-slate-500"><CalendarClock className="h-3.5 w-3.5 shrink-0" /> Last push</div>
+            <div className="mt-1 font-medium text-white">{formatDate(repo.pushedAt)}</div>
+          </div>
+        </div>
+        <details className="rounded-lg border border-white/10 bg-slate-950/40 p-3 text-sm text-slate-300">
+          <summary className="cursor-pointer font-medium text-cyan-100">{repo.files.length} matching workflow file{repo.files.length === 1 ? '' : 's'}</summary>
+          <ul className="mt-3 grid gap-2">
+            {repo.files.map((file) => (
+              <li key={file.url}>
+                <a className="inline-flex items-center gap-2 break-all text-slate-300 underline-offset-4 hover:text-cyan-100 hover:underline" href={file.url} target="_blank" rel="noreferrer">
+                  <FileCode2 className="h-4 w-4 shrink-0 text-slate-500" /> {file.path}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </details>
+      </CardContent>
+    </Card>
+  );
+}
+
+type VirtualRepositoryListProps = {
+  repositories: RepoResult[];
+};
+
+const VIRTUAL_OVERSCAN = 6;
+const DESKTOP_ROW_HEIGHT = 356;
+const MOBILE_ROW_HEIGHT = 456;
+
+function VirtualRepositoryList({ repositories }: VirtualRepositoryListProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [viewport, setViewport] = useState({ height: 900, width: 1280, scrollY: 0 });
+
+  useEffect(() => {
+    let frame = 0;
+    const updateViewport = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        setViewport({ height: window.innerHeight, width: window.innerWidth, scrollY: window.scrollY });
+      });
+    };
+
+    updateViewport();
+    window.addEventListener('scroll', updateViewport, { passive: true });
+    window.addEventListener('resize', updateViewport);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', updateViewport);
+      window.removeEventListener('resize', updateViewport);
+    };
+  }, []);
+
+  const rowHeight = viewport.width < 640 ? MOBILE_ROW_HEIGHT : DESKTOP_ROW_HEIGHT;
+  const containerTop = containerRef.current ? containerRef.current.getBoundingClientRect().top + viewport.scrollY : 0;
+  const rawStartIndex = Math.floor((viewport.scrollY - containerTop) / rowHeight) - VIRTUAL_OVERSCAN;
+  const startIndex = Math.max(0, Math.min(repositories.length, rawStartIndex));
+  const visibleCount = Math.ceil(viewport.height / rowHeight) + VIRTUAL_OVERSCAN * 2;
+  const endIndex = Math.min(repositories.length, startIndex + visibleCount);
+  const visibleRepositories = repositories.slice(startIndex, endIndex);
+  const totalHeight = repositories.length * rowHeight;
+
+  return (
+    <div ref={containerRef} className="relative min-w-0" style={{ height: totalHeight }}>
+      <div className="absolute inset-x-0 top-0 grid gap-4" style={{ transform: `translateY(${startIndex * rowHeight}px)` }}>
+        {visibleRepositories.map((repo) => (
+          <div key={repo.fullName} style={{ minHeight: rowHeight - 16 }}>
+            <RepositoryCard repo={repo} />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -237,52 +344,7 @@ function App() {
             <Badge variant="outline" className="border-white/15 bg-white/5 text-slate-300">Live static data</Badge>
           </div>
 
-          {visibleRepos.map((repo) => (
-            <Card key={repo.fullName} className="group min-w-0 overflow-hidden border-white/10 bg-white/[0.035] shadow-xl shadow-black/10 backdrop-blur-xl transition duration-200 hover:-translate-y-0.5 hover:border-cyan-300/30 hover:bg-white/[0.055]">
-              <CardHeader className="gap-4 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6">
-                <div className="min-w-0 space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <a className="break-all text-xl font-semibold tracking-tight text-white underline-offset-4 hover:underline" href={repo.url} target="_blank" rel="noreferrer">
-                      {repo.fullName}
-                    </a>
-                    <ArrowUpRight className="h-4 w-4 text-slate-500 transition group-hover:text-cyan-200" />
-                  </div>
-                  <CardDescription className="max-w-4xl text-slate-400">{repo.description || 'No description provided.'}</CardDescription>
-                </div>
-                <Badge className="w-fit border-amber-300/20 bg-amber-300/10 text-amber-100 hover:bg-amber-300/10">
-                  <Star className="mr-1 h-3.5 w-3.5 fill-current" /> {repo.stars.toLocaleString()}
-                </Badge>
-              </CardHeader>
-              <CardContent className="space-y-4 p-5 pt-0 sm:p-6 sm:pt-0">
-                <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
-                  <div className="min-w-0 rounded-lg border border-white/10 bg-slate-950/50 p-3">
-                    <div className="text-xs uppercase tracking-wide text-slate-500">Language</div>
-                    <div className="mt-1 font-medium text-white">{repo.language || 'Unknown'}</div>
-                  </div>
-                  <div className="min-w-0 rounded-lg border border-white/10 bg-slate-950/50 p-3">
-                    <div className="flex min-w-0 items-center gap-1 text-xs uppercase tracking-wide text-slate-500"><GitBranch className="h-3.5 w-3.5 shrink-0" /> Default branch</div>
-                    <div className="mt-1 break-words font-medium text-white">{repo.defaultBranch}</div>
-                  </div>
-                  <div className="min-w-0 rounded-lg border border-white/10 bg-slate-950/50 p-3">
-                    <div className="flex min-w-0 items-center gap-1 text-xs uppercase tracking-wide text-slate-500"><CalendarClock className="h-3.5 w-3.5 shrink-0" /> Last push</div>
-                    <div className="mt-1 font-medium text-white">{formatDate(repo.pushedAt)}</div>
-                  </div>
-                </div>
-                <details className="rounded-lg border border-white/10 bg-slate-950/40 p-3 text-sm text-slate-300">
-                  <summary className="cursor-pointer font-medium text-cyan-100">{repo.files.length} matching workflow file{repo.files.length === 1 ? '' : 's'}</summary>
-                  <ul className="mt-3 grid gap-2">
-                    {repo.files.map((file) => (
-                      <li key={file.url}>
-                        <a className="inline-flex items-center gap-2 break-all text-slate-300 underline-offset-4 hover:text-cyan-100 hover:underline" href={file.url} target="_blank" rel="noreferrer">
-                          <FileCode2 className="h-4 w-4 shrink-0 text-slate-500" /> {file.path}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              </CardContent>
-            </Card>
-          ))}
+          <VirtualRepositoryList repositories={visibleRepos} />
         </section>
       </section>
     </main>

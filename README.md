@@ -39,10 +39,10 @@ scripts/update-data-local.sh 10
 
 The time-budget scan first fetches the regular GitHub Code Search best-match results up to GitHub's 1,000-result paging limit, then uses file-size shards only as opportunistic backfill if time remains. GitHub Code Search does not support repository-star sorting before retrieval, so star order is applied after metadata is fetched.
 
-For a quick limited scan, use `SCAN_MODE=limited` and `MAX_SEARCH_RESULTS`:
+For a quick limited scan, use `SCAN_MODE=limited` and `MAX_SEARCH_RESULTS`. The Actions workflow defaults to 1,000 code-search items so near-boundary matches are less likely to be missed:
 
 ```sh
-SCAN_MODE=limited MAX_SEARCH_RESULTS=500 scripts/update-data-local.sh
+SCAN_MODE=limited MAX_SEARCH_RESULTS=1000 scripts/update-data-local.sh
 ```
 
 After reviewing the generated JSON, commit and push the updated data:
