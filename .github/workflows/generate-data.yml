@@ -43,6 +43,7 @@ concurrency:
 jobs:
   generate:
     runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
     env:
       SCAN_MODE: ${{ github.event.inputs.scan_mode || 'limited' }}
       MAX_SEARCH_RESULTS: ${{ github.event.inputs.max_search_results || '1000' }}
