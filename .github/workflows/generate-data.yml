@@ -3,10 +3,16 @@ name: Generate repository index
 on:
   schedule:
     - cron: '17 2 * * *'
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/**'
+      - '.github/workflows/generate-data.yml'
   workflow_dispatch:
     inputs:
       scan_mode:
-        description: Scan mode for scripts/generate-data.mjs
+        description: Scan mode for scripts/generate-data.ts
         required: true
         default: limited
         type: choice
@@ -46,39 +52,12 @@ jobs:
         uses: actions/checkout@v6
         with:
           token: ${{ github.token }}
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-      - name: Setup Node
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
       - name: Generate static data
-        run: pnpm generate:data -- --scan-mode "$SCAN_MODE" --minutes "$SCAN_MINUTES"
+        run: bun scripts/generate-data.ts --scan-mode "$SCAN_MODE" --minutes "$SCAN_MINUTES"
       - name: Print generated data summary
-        run: |
-          node <<'NODE'
-          const fs = require('node:fs');
-          const data = JSON.parse(fs.readFileSync('public/data/repositories.json', 'utf8'));
-          console.log(JSON.stringify({
-            generatedAt: data.generatedAt,
-            scanMode: data.scanMode,
-            scanMinutesRequested: data.scanMinutesRequested,
-            scanElapsedSeconds: data.scanElapsedSeconds,
-            totalCount: data.totalCount,
-            retrievedFileCount: data.retrievedFileCount,
-            repositoryCount: data.repositoryCount,
-            searchRequestCount: data.searchRequestCount,
-            searchResultLimit: data.searchResultLimit,
-            searchResultLimitReached: data.searchResultLimitReached,
-            topRepository: data.repositories?.[0]?.fullName ?? null,
-            openClawRepositories: data.repositories
-              ?.filter((repo) => repo.fullName.toLowerCase().includes('openclaw'))
-              .map((repo) => repo.fullName) ?? [],
-          }, null, 2));
-          NODE
+        run: bun scripts/print-summary.ts
       - name: Commit generated data
         run: |
           if git diff --quiet -- public/data/repositories.json; then
