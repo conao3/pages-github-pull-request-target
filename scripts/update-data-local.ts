@@ -25,7 +25,9 @@ const env = {
 };
 $.env({ ...process.env, ...env });
 
-console.log(`Generating static data with SCAN_MODE=${env.SCAN_MODE} SCAN_MINUTES=${minutes} MAX_SEARCH_RESULTS=${env.MAX_SEARCH_RESULTS}`);
+console.log(
+  `Generating static data with SCAN_MODE=${env.SCAN_MODE} SCAN_MINUTES=${minutes} MAX_SEARCH_RESULTS=${env.MAX_SEARCH_RESULTS}`,
+);
 
 await $`pnpm install --frozen-lockfile`;
 await $`bun scripts/generate-data.ts --minutes ${minutes}`;

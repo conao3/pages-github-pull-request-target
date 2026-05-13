@@ -31,20 +31,27 @@ const gitRoot = (await $`git rev-parse --show-toplevel`.text()).trim();
 const relativePath = process.env.OUTPUT_PATH ?? 'public/data/repositories.json';
 const data = (await Bun.file(`${gitRoot}/${relativePath}`).json()) as RepositoryIndex;
 
-console.log(JSON.stringify({
-  generatedAt: data.generatedAt,
-  scanMode: data.scanMode,
-  scanMinutesRequested: data.scanMinutesRequested,
-  scanElapsedSeconds: data.scanElapsedSeconds,
-  totalCount: data.totalCount,
-  retrievedFileCount: data.retrievedFileCount,
-  searchResultLimit: data.searchResultLimit,
-  searchResultLimitReached: data.searchResultLimitReached,
-  searchRequestCount: data.searchRequestCount,
-  shardCount: data.shardCount,
-  repositoryCount: data.repositoryCount,
-  topRepository: data.repositories?.[0]?.fullName ?? null,
-  openClawRepositories: data.repositories
-    ?.filter((repo) => repo.fullName.toLowerCase().includes('openclaw'))
-    .map((repo) => repo.fullName) ?? [],
-}, null, 2));
+console.log(
+  JSON.stringify(
+    {
+      generatedAt: data.generatedAt,
+      scanMode: data.scanMode,
+      scanMinutesRequested: data.scanMinutesRequested,
+      scanElapsedSeconds: data.scanElapsedSeconds,
+      totalCount: data.totalCount,
+      retrievedFileCount: data.retrievedFileCount,
+      searchResultLimit: data.searchResultLimit,
+      searchResultLimitReached: data.searchResultLimitReached,
+      searchRequestCount: data.searchRequestCount,
+      shardCount: data.shardCount,
+      repositoryCount: data.repositoryCount,
+      topRepository: data.repositories?.[0]?.fullName ?? null,
+      openClawRepositories:
+        data.repositories
+          ?.filter((repo) => repo.fullName.toLowerCase().includes('openclaw'))
+          .map((repo) => repo.fullName) ?? [],
+    },
+    null,
+    2,
+  ),
+);

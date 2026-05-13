@@ -75,12 +75,14 @@ for (let index = 2; index < process.argv.length; index += 1) {
 }
 
 const token = process.env.GITHUB_TOKEN;
-const query = process.env.SEARCH_QUERY ?? 'pull_request_target path:.github/workflows in:file -fork:true';
+const query =
+  process.env.SEARCH_QUERY ?? 'pull_request_target path:.github/workflows in:file -fork:true';
 const outputPath = process.env.OUTPUT_PATH ?? 'public/data/repositories.json';
 const pageSize = 100;
-const maxSearchResults = process.env.MAX_SEARCH_RESULTS === 'all'
-  ? Number.POSITIVE_INFINITY
-  : Number(process.env.MAX_SEARCH_RESULTS ?? '1000');
+const maxSearchResults =
+  process.env.MAX_SEARCH_RESULTS === 'all'
+    ? Number.POSITIVE_INFINITY
+    : Number(process.env.MAX_SEARCH_RESULTS ?? '1000');
 const scanMode = args.get('scan-mode') ?? process.env.SCAN_MODE ?? 'limited';
 const scanMinutes = Number(args.get('minutes') ?? process.env.SCAN_MINUTES ?? '10');
 const retryDelayMs = Number(process.env.RETRY_DELAY_MS ?? '65000');
@@ -144,7 +146,14 @@ function resetDelayMs(rateLimit: RateLimit | null | undefined): number {
 }
 
 function isRetryableStatus(status: number): boolean {
-  return status === 403 || status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+  return (
+    status === 403 ||
+    status === 429 ||
+    status === 500 ||
+    status === 502 ||
+    status === 503 ||
+    status === 504
+  );
 }
 
 async function githubJson<T = SearchResponse>(
@@ -157,7 +166,9 @@ async function githubJson<T = SearchResponse>(
       response = await fetchWithTimeout(url, { headers: headers() });
     } catch (error) {
       if (attempt < retry) {
-        console.warn(`GitHub API request failed; retrying in ${Math.ceil(retryDelayMs / 1000)}s (${attempt}/${retry}): ${error}`);
+        console.warn(
+          `GitHub API request failed; retrying in ${Math.ceil(retryDelayMs / 1000)}s (${attempt}/${retry}): ${error}`,
+        );
         await sleep(retryDelayMs);
         continue;
       }
@@ -170,7 +181,9 @@ async function githubJson<T = SearchResponse>(
     const body = await response.text();
     const delay = resetDelayMs(rateLimit);
     if (isRetryableStatus(response.status) && attempt < retry) {
-      console.warn(`GitHub API ${response.status}; retrying in ${Math.ceil(delay / 1000)}s (${attempt}/${retry})`);
+      console.warn(
+        `GitHub API ${response.status}; retrying in ${Math.ceil(delay / 1000)}s (${attempt}/${retry})`,
+      );
       await sleep(delay);
       continue;
     }
@@ -196,7 +209,9 @@ async function githubGraphql<T>(
       });
     } catch (error) {
       if (attempt < retry) {
-        console.warn(`GitHub GraphQL request failed; retrying in ${Math.ceil(retryDelayMs / 1000)}s (${attempt}/${retry}): ${error}`);
+        console.warn(
+          `GitHub GraphQL request failed; retrying in ${Math.ceil(retryDelayMs / 1000)}s (${attempt}/${retry}): ${error}`,
+        );
         await sleep(retryDelayMs);
         continue;
       }
@@ -207,12 +222,15 @@ async function githubGraphql<T>(
     if (response.ok) {
       const payload = JSON.parse(body) as { data?: T; errors?: unknown };
       if (!payload.errors) return payload.data as T;
-      if (attempt >= retry) throw new Error(`GitHub GraphQL errors: ${JSON.stringify(payload.errors)}`);
+      if (attempt >= retry)
+        throw new Error(`GitHub GraphQL errors: ${JSON.stringify(payload.errors)}`);
     } else if (!isRetryableStatus(response.status)) {
       throw new Error(`GitHub GraphQL ${response.status}: ${body || response.statusText}`);
     }
 
-    console.warn(`GitHub GraphQL retrying in ${Math.ceil(retryDelayMs / 1000)}s (${attempt}/${retry})`);
+    console.warn(
+      `GitHub GraphQL retrying in ${Math.ceil(retryDelayMs / 1000)}s (${attempt}/${retry})`,
+    );
     await sleep(retryDelayMs);
   }
 
@@ -243,13 +261,46 @@ function addSearchItems(
 
 function sizeShards(): string[] {
   const ranges: Array<[number, number]> = [
-    [769, 896], [897, 1024], [1025, 1280], [1281, 1536], [1537, 2048],
-    [2049, 3072], [3073, 4096], [4097, 6144], [6145, 8192],
-    [8193, 12288], [12289, 16384], [16385, 32768], [32769, 65536],
-    [513, 544], [545, 576], [577, 640], [641, 704], [705, 768],
-    [385, 400], [401, 416], [417, 432], [433, 448], [449, 464], [465, 480], [481, 496], [497, 512],
-    [0, 128], [129, 192], [193, 224], [225, 256], [257, 272], [273, 288], [289, 304], [305, 320], [321, 336], [337, 352], [353, 368], [369, 384],
-    [65537, 131072], [131073, 262144],
+    [769, 896],
+    [897, 1024],
+    [1025, 1280],
+    [1281, 1536],
+    [1537, 2048],
+    [2049, 3072],
+    [3073, 4096],
+    [4097, 6144],
+    [6145, 8192],
+    [8193, 12288],
+    [12289, 16384],
+    [16385, 32768],
+    [32769, 65536],
+    [513, 544],
+    [545, 576],
+    [577, 640],
+    [641, 704],
+    [705, 768],
+    [385, 400],
+    [401, 416],
+    [417, 432],
+    [433, 448],
+    [449, 464],
+    [465, 480],
+    [481, 496],
+    [497, 512],
+    [0, 128],
+    [129, 192],
+    [193, 224],
+    [225, 256],
+    [257, 272],
+    [273, 288],
+    [289, 304],
+    [305, 320],
+    [321, 336],
+    [337, 352],
+    [353, 368],
+    [369, 384],
+    [65537, 131072],
+    [131073, 262144],
   ];
   return ranges.map(([min, max]) => `${query} size:${min}..${max}`).concat(`${query} size:>262144`);
 }
@@ -284,7 +335,8 @@ async function waitForSearchBudget(
   neededRequests: number,
   deadline: number,
 ): Promise<boolean> {
-  if (lastRateLimit?.remaining === undefined || lastRateLimit.remaining >= neededRequests) return true;
+  if (lastRateLimit?.remaining === undefined || lastRateLimit.remaining >= neededRequests)
+    return true;
 
   const delay = resetDelayMs(lastRateLimit);
   if (Date.now() + delay >= deadline) return false;
@@ -310,7 +362,7 @@ async function fetchQueryIntoScan(
     repositoriesAfterShard: scan.filesByRepo.size,
   };
 
-  for (let page = 1; page <= maxPages;) {
+  for (let page = 1; page <= maxPages; ) {
     if (Date.now() >= deadline) break;
 
     const remainingPages = maxPages - page + 1;
@@ -318,16 +370,21 @@ async function fetchQueryIntoScan(
     const canContinue = await waitForSearchBudget(scan.lastRateLimit, burstSize, deadline);
     if (!canContinue) break;
 
-    const burstPages = Array.from({ length: burstSize }, (_, offset) => page + offset)
-      .filter(() => Date.now() < deadline);
+    const burstPages = Array.from({ length: burstSize }, (_, offset) => page + offset).filter(
+      () => Date.now() < deadline,
+    );
     if (burstPages.length === 0) break;
 
-    const results = await Promise.all(burstPages.map(async (currentPage) => {
-      const remainingResults = maxResults - (currentPage - 1) * pageSize;
-      const perPage = Math.min(pageSize, remainingResults);
-      const { data, rateLimit } = await githubJson<SearchResponse>(searchUrl(searchQuery, perPage, currentPage));
-      return { currentPage, data, rateLimit };
-    }));
+    const results = await Promise.all(
+      burstPages.map(async (currentPage) => {
+        const remainingResults = maxResults - (currentPage - 1) * pageSize;
+        const perPage = Math.min(pageSize, remainingResults);
+        const { data, rateLimit } = await githubJson<SearchResponse>(
+          searchUrl(searchQuery, perPage, currentPage),
+        );
+        return { currentPage, data, rateLimit };
+      }),
+    );
     scan.searchRequestCount += results.length;
 
     let shouldStopQuery = false;
@@ -341,7 +398,9 @@ async function fetchQueryIntoScan(
       if ((result.data.items ?? []).length === 0) shouldStopQuery = true;
     }
 
-    console.log(`${label} pages ${burstPages[0]}-${burstPages.at(-1)}: ${scan.filesByRepo.size} repositories total`);
+    console.log(
+      `${label} pages ${burstPages[0]}-${burstPages.at(-1)}: ${scan.filesByRepo.size} repositories total`,
+    );
     page += burstPages.length;
     if (shouldStopQuery) break;
   }
@@ -364,11 +423,18 @@ async function fetchTimeBudgetScan(): Promise<Scan & { shards: ShardStat[] }> {
   };
   const shardStats: ShardStat[] = [];
 
-  const effectiveSearchDeadline = searchDeadline > startedAt ? searchDeadline : deadline - buildReserveSeconds * 1000;
+  const effectiveSearchDeadline =
+    searchDeadline > startedAt ? searchDeadline : deadline - buildReserveSeconds * 1000;
 
   // Best-match first: this preserves high-signal candidates that GitHub ranks near the top
   // and avoids the previous failure mode where size shards skipped OpenClaw-like repos.
-  const baseStat = await fetchQueryIntoScan(scan, query, 'base-best-match', effectiveSearchDeadline, maxSearchResultsPerQuery);
+  const baseStat = await fetchQueryIntoScan(
+    scan,
+    query,
+    'base-best-match',
+    effectiveSearchDeadline,
+    maxSearchResultsPerQuery,
+  );
   shardStats.push(baseStat);
 
   // After the first 1,000 best-match results, use size shards only as opportunistic
@@ -376,7 +442,13 @@ async function fetchTimeBudgetScan(): Promise<Scan & { shards: ShardStat[] }> {
   for (const [shardIndex, shardQuery] of sizeShards().entries()) {
     if (Date.now() >= effectiveSearchDeadline) break;
     const before = scan.filesByRepo.size;
-    const stat = await fetchQueryIntoScan(scan, shardQuery, `supplement-size-${shardIndex + 1}`, effectiveSearchDeadline, maxSearchResultsPerQuery);
+    const stat = await fetchQueryIntoScan(
+      scan,
+      shardQuery,
+      `supplement-size-${shardIndex + 1}`,
+      effectiveSearchDeadline,
+      maxSearchResultsPerQuery,
+    );
     stat.newRepositories = scan.filesByRepo.size - before;
     shardStats.push(stat);
   }
@@ -452,13 +524,17 @@ async function fetchRepoDetails(
 
   for (let index = 0; index < entries.length; index += detailBatchSize) {
     if (Date.now() >= deadline) {
-      console.warn(`Stopping repository detail fetch at ${index}/${entries.length}; time budget exhausted`);
+      console.warn(
+        `Stopping repository detail fetch at ${index}/${entries.length}; time budget exhausted`,
+      );
       break;
     }
     const batch = entries.slice(index, index + detailBatchSize);
     let data: { nodes?: RepoNode[] };
     try {
-      data = await githubGraphql<{ nodes?: RepoNode[] }>(document, { ids: batch.map(([, nodeId]) => nodeId) });
+      data = await githubGraphql<{ nodes?: RepoNode[] }>(document, {
+        ids: batch.map(([, nodeId]) => nodeId),
+      });
     } catch (error) {
       console.warn(`Skipping repository detail batch ${index}-${index + batch.length}: ${error}`);
       continue;
@@ -477,7 +553,9 @@ async function fetchRepoDetails(
         fork: repo.isFork,
       });
     }
-    console.log(`Fetched repository details ${Math.min(index + batch.length, entries.length)}/${entries.length}`);
+    console.log(
+      `Fetched repository details ${Math.min(index + batch.length, entries.length)}/${entries.length}`,
+    );
     await sleep(500);
   }
 
@@ -486,9 +564,10 @@ async function fetchRepoDetails(
 
 async function main(): Promise<void> {
   const overallStartedAt = Date.now();
-  const overallDeadline = scanMode === 'time-budget'
-    ? overallStartedAt + scanMinutes * 60_000 - buildReserveSeconds * 1000
-    : Number.POSITIVE_INFINITY;
+  const overallDeadline =
+    scanMode === 'time-budget'
+      ? overallStartedAt + scanMinutes * 60_000 - buildReserveSeconds * 1000
+      : Number.POSITIVE_INFINITY;
   const scan = scanMode === 'time-budget' ? await fetchTimeBudgetScan() : await fetchLimitedScan();
   const repoDetails = await fetchRepoDetails(scan.repoNodes, overallDeadline);
 
@@ -515,7 +594,8 @@ async function main(): Promise<void> {
     incompleteResults: scan.incompleteResults,
     retrievedFileCount,
     searchResultLimit: scanMode === 'time-budget' ? null : maxSearchResults,
-    searchResultLimitReached: scanMode === 'time-budget' ? true : scan.totalCount > retrievedFileCount,
+    searchResultLimitReached:
+      scanMode === 'time-budget' ? true : scan.totalCount > retrievedFileCount,
     searchRequestCount: scan.searchRequestCount,
     shardCount: scan.shards.length,
     shardTotalCount: null,
