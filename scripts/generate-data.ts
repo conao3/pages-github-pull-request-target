@@ -1,11 +1,74 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+#!/usr/bin/env nix
+/*
+#! nix shell --inputs-from . nixpkgs#bun -c bun
+*/
 
-const args = new Map();
+import { $ } from 'bun';
+
+type RateLimit = {
+  limit: number;
+  remaining: number;
+  resetAt: number;
+  resource: string | null;
+};
+
+type SearchItem = {
+  path: string;
+  html_url: string;
+  repository: {
+    full_name: string;
+    node_id: string;
+  };
+};
+
+type SearchResponse = {
+  total_count?: number;
+  incomplete_results?: boolean;
+  items?: SearchItem[];
+};
+
+type FileEntry = { path: string; url: string };
+
+type Scan = {
+  filesByRepo: Map<string, FileEntry[]>;
+  repoNodes: Map<string, string>;
+  totalCount: number;
+  incompleteResults: boolean;
+  searchRequestCount: number;
+  lastRateLimit?: RateLimit | null;
+  scanStartedAt?: string;
+  scanElapsedSeconds?: number;
+  scanDeadlineAt?: string;
+  searchDeadlineAt?: string;
+};
+
+type ShardStat = {
+  label: string;
+  query: string;
+  pagesFetched: number;
+  itemsFetched: number;
+  repositoriesAfterShard: number;
+  newRepositories?: number;
+};
+
+type RepoDetail = {
+  fullName: string;
+  url: string;
+  description: string | null;
+  stars: number;
+  language: string | null;
+  defaultBranch: string;
+  pushedAt: string;
+  updatedAt: string;
+  fork: boolean;
+};
+
+const args = new Map<string, string | undefined>();
 for (let index = 2; index < process.argv.length; index += 1) {
   const arg = process.argv[index];
   if (arg === '--') continue;
   if (!arg.startsWith('--')) continue;
-  const [key, inlineValue] = arg.slice(2).split('=', 2);
+  const [key, inlineValue] = arg.slice(2).split('=', 2) as [string, string | undefined];
   const value = inlineValue ?? process.argv[index + 1];
   args.set(key, value);
   if (inlineValue === undefined) index += 1;
@@ -15,7 +78,9 @@ const token = process.env.GITHUB_TOKEN;
 const query = process.env.SEARCH_QUERY ?? 'pull_request_target path:.github/workflows in:file -fork:true';
 const outputPath = process.env.OUTPUT_PATH ?? 'public/data/repositories.json';
 const pageSize = 100;
-const maxSearchResults = process.env.MAX_SEARCH_RESULTS === 'all' ? Number.POSITIVE_INFINITY : Number(process.env.MAX_SEARCH_RESULTS ?? '1000');
+const maxSearchResults = process.env.MAX_SEARCH_RESULTS === 'all'
+  ? Number.POSITIVE_INFINITY
+  : Number(process.env.MAX_SEARCH_RESULTS ?? '1000');
 const scanMode = args.get('scan-mode') ?? process.env.SCAN_MODE ?? 'limited';
 const scanMinutes = Number(args.get('minutes') ?? process.env.SCAN_MINUTES ?? '10');
 const retryDelayMs = Number(process.env.RETRY_DELAY_MS ?? '65000');
@@ -33,7 +98,7 @@ if (!token) {
   throw new Error('GITHUB_TOKEN is required. In GitHub Actions this is provided automatically.');
 }
 
-function headers() {
+function headers(): Record<string, string> {
   return {
     Accept: 'application/vnd.github+json',
     Authorization: `Bearer ${token}`,
@@ -42,18 +107,18 @@ function headers() {
   };
 }
 
-function graphqlHeaders() {
+function graphqlHeaders(): Record<string, string> {
   return {
     ...headers(),
     'Content-Type': 'application/json',
   };
 }
 
-function sleep(ms) {
+function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchWithTimeout(url, options = {}) {
+async function fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), fetchTimeoutMs);
   try {
@@ -63,7 +128,7 @@ async function fetchWithTimeout(url, options = {}) {
   }
 }
 
-function parseRateLimit(response) {
+function parseRateLimit(response: Response): RateLimit {
   const resetSeconds = Number(response.headers.get('x-ratelimit-reset') ?? '0');
   return {
     limit: Number(response.headers.get('x-ratelimit-limit') ?? '0'),
@@ -73,18 +138,21 @@ function parseRateLimit(response) {
   };
 }
 
-function resetDelayMs(rateLimit) {
-  if (!rateLimit.resetAt) return retryDelayMs;
+function resetDelayMs(rateLimit: RateLimit | null | undefined): number {
+  if (!rateLimit?.resetAt) return retryDelayMs;
   return Math.max(0, rateLimit.resetAt - Date.now() + rateLimitSafetyMs);
 }
 
-function isRetryableStatus(status) {
+function isRetryableStatus(status: number): boolean {
   return status === 403 || status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
 }
 
-async function githubJson(url, { retry = retryAttempts } = {}) {
+async function githubJson<T = SearchResponse>(
+  url: string,
+  { retry = retryAttempts }: { retry?: number } = {},
+): Promise<{ data: T; rateLimit: RateLimit }> {
   for (let attempt = 1; attempt <= retry; attempt += 1) {
-    let response;
+    let response: Response;
     try {
       response = await fetchWithTimeout(url, { headers: headers() });
     } catch (error) {
@@ -97,7 +165,7 @@ async function githubJson(url, { retry = retryAttempts } = {}) {
     }
 
     const rateLimit = parseRateLimit(response);
-    if (response.ok) return { data: await response.json(), rateLimit };
+    if (response.ok) return { data: (await response.json()) as T, rateLimit };
 
     const body = await response.text();
     const delay = resetDelayMs(rateLimit);
@@ -113,9 +181,13 @@ async function githubJson(url, { retry = retryAttempts } = {}) {
   throw new Error(`GitHub API failed: ${url}`);
 }
 
-async function githubGraphql(document, variables, { retry = retryAttempts } = {}) {
+async function githubGraphql<T>(
+  document: string,
+  variables: Record<string, unknown>,
+  { retry = retryAttempts }: { retry?: number } = {},
+): Promise<T> {
   for (let attempt = 1; attempt <= retry; attempt += 1) {
-    let response;
+    let response: Response;
     try {
       response = await fetchWithTimeout('https://api.github.com/graphql', {
         method: 'POST',
@@ -133,8 +205,8 @@ async function githubGraphql(document, variables, { retry = retryAttempts } = {}
     const body = await response.text();
 
     if (response.ok) {
-      const payload = JSON.parse(body);
-      if (!payload.errors) return payload.data;
+      const payload = JSON.parse(body) as { data?: T; errors?: unknown };
+      if (!payload.errors) return payload.data as T;
       if (attempt >= retry) throw new Error(`GitHub GraphQL errors: ${JSON.stringify(payload.errors)}`);
     } else if (!isRetryableStatus(response.status)) {
       throw new Error(`GitHub GraphQL ${response.status}: ${body || response.statusText}`);
@@ -147,7 +219,7 @@ async function githubGraphql(document, variables, { retry = retryAttempts } = {}
   throw new Error('GitHub GraphQL failed');
 }
 
-function searchUrl(searchQuery, perPage, page = 1) {
+function searchUrl(searchQuery: string, perPage: number, page = 1): string {
   const url = new URL('https://api.github.com/search/code');
   url.searchParams.set('q', searchQuery);
   url.searchParams.set('per_page', String(perPage));
@@ -155,7 +227,11 @@ function searchUrl(searchQuery, perPage, page = 1) {
   return url.toString();
 }
 
-function addSearchItems(filesByRepo, repoNodes, items) {
+function addSearchItems(
+  filesByRepo: Map<string, FileEntry[]>,
+  repoNodes: Map<string, string>,
+  items: SearchItem[] | undefined,
+): void {
   for (const item of items ?? []) {
     const repoName = item.repository.full_name;
     const files = filesByRepo.get(repoName) ?? [];
@@ -165,20 +241,8 @@ function addSearchItems(filesByRepo, repoNodes, items) {
   }
 }
 
-function mergeScan(target, source) {
-  for (const [repoName, files] of source.filesByRepo.entries()) {
-    const existing = target.filesByRepo.get(repoName) ?? [];
-    existing.push(...files);
-    target.filesByRepo.set(repoName, existing);
-  }
-  for (const [repoName, nodeId] of source.repoNodes.entries()) target.repoNodes.set(repoName, nodeId);
-  target.totalCount = Math.max(target.totalCount, source.totalCount);
-  target.incompleteResults = target.incompleteResults || source.incompleteResults;
-  target.searchRequestCount += source.searchRequestCount;
-}
-
-function sizeShards() {
-  const ranges = [
+function sizeShards(): string[] {
+  const ranges: Array<[number, number]> = [
     [769, 896], [897, 1024], [1025, 1280], [1281, 1536], [1537, 2048],
     [2049, 3072], [3073, 4096], [4097, 6144], [6145, 8192],
     [8193, 12288], [12289, 16384], [16385, 32768], [32769, 65536],
@@ -190,9 +254,9 @@ function sizeShards() {
   return ranges.map(([min, max]) => `${query} size:${min}..${max}`).concat(`${query} size:>262144`);
 }
 
-async function fetchSearchPages(searchQuery, maxResults) {
-  const filesByRepo = new Map();
-  const repoNodes = new Map();
+async function fetchSearchPages(searchQuery: string, maxResults: number): Promise<Scan> {
+  const filesByRepo = new Map<string, FileEntry[]>();
+  const repoNodes = new Map<string, string>();
   let totalCount = 0;
   let incompleteResults = false;
   let searchRequestCount = 0;
@@ -201,7 +265,7 @@ async function fetchSearchPages(searchQuery, maxResults) {
   for (let page = 1; page <= maxPages; page += 1) {
     const remainingResults = maxResults - (page - 1) * pageSize;
     const perPage = Math.min(pageSize, remainingResults);
-    const { data } = await githubJson(searchUrl(searchQuery, perPage, page));
+    const { data } = await githubJson<SearchResponse>(searchUrl(searchQuery, perPage, page));
     searchRequestCount += 1;
     totalCount = data.total_count ?? totalCount;
     incompleteResults = incompleteResults || Boolean(data.incomplete_results);
@@ -215,7 +279,11 @@ async function fetchSearchPages(searchQuery, maxResults) {
   return { filesByRepo, repoNodes, totalCount, incompleteResults, searchRequestCount };
 }
 
-async function waitForSearchBudget(lastRateLimit, neededRequests, deadline) {
+async function waitForSearchBudget(
+  lastRateLimit: RateLimit | null | undefined,
+  neededRequests: number,
+  deadline: number,
+): Promise<boolean> {
   if (lastRateLimit?.remaining === undefined || lastRateLimit.remaining >= neededRequests) return true;
 
   const delay = resetDelayMs(lastRateLimit);
@@ -226,9 +294,15 @@ async function waitForSearchBudget(lastRateLimit, neededRequests, deadline) {
   return true;
 }
 
-async function fetchQueryIntoScan(scan, searchQuery, label, deadline, maxResults = maxSearchResultsPerQuery) {
+async function fetchQueryIntoScan(
+  scan: Scan,
+  searchQuery: string,
+  label: string,
+  deadline: number,
+  maxResults: number = maxSearchResultsPerQuery,
+): Promise<ShardStat> {
   const maxPages = Math.min(10, Math.ceil(maxResults / pageSize));
-  const stat = {
+  const stat: ShardStat = {
     label,
     query: searchQuery,
     pagesFetched: 0,
@@ -251,7 +325,7 @@ async function fetchQueryIntoScan(scan, searchQuery, label, deadline, maxResults
     const results = await Promise.all(burstPages.map(async (currentPage) => {
       const remainingResults = maxResults - (currentPage - 1) * pageSize;
       const perPage = Math.min(pageSize, remainingResults);
-      const { data, rateLimit } = await githubJson(searchUrl(searchQuery, perPage, currentPage));
+      const { data, rateLimit } = await githubJson<SearchResponse>(searchUrl(searchQuery, perPage, currentPage));
       return { currentPage, data, rateLimit };
     }));
     scan.searchRequestCount += results.length;
@@ -276,11 +350,11 @@ async function fetchQueryIntoScan(scan, searchQuery, label, deadline, maxResults
   return stat;
 }
 
-async function fetchTimeBudgetScan() {
+async function fetchTimeBudgetScan(): Promise<Scan & { shards: ShardStat[] }> {
   const startedAt = Date.now();
   const deadline = startedAt + scanMinutes * 60_000;
   const searchDeadline = deadline - (detailReserveSeconds + buildReserveSeconds) * 1000;
-  const scan = {
+  const scan: Scan = {
     filesByRepo: new Map(),
     repoNodes: new Map(),
     totalCount: 0,
@@ -288,7 +362,7 @@ async function fetchTimeBudgetScan() {
     searchRequestCount: 0,
     lastRateLimit: null,
   };
-  const shardStats = [];
+  const shardStats: ShardStat[] = [];
 
   const effectiveSearchDeadline = searchDeadline > startedAt ? searchDeadline : deadline - buildReserveSeconds * 1000;
 
@@ -318,7 +392,7 @@ async function fetchTimeBudgetScan() {
   };
 }
 
-async function fetchLimitedScan() {
+async function fetchLimitedScan(): Promise<Scan & { shards: ShardStat[] }> {
   const result = await fetchSearchPages(query, maxSearchResults);
   return {
     ...result,
@@ -328,8 +402,8 @@ async function fetchLimitedScan() {
   };
 }
 
-function uniqueFiles(files) {
-  const seen = new Set();
+function uniqueFiles(files: FileEntry[]): FileEntry[] {
+  const seen = new Set<string>();
   return files.filter((file) => {
     const key = `${file.path}\0${file.url}`;
     if (seen.has(key)) return false;
@@ -338,9 +412,25 @@ function uniqueFiles(files) {
   });
 }
 
-async function fetchRepoDetails(repoNodes, deadline = Number.POSITIVE_INFINITY) {
+type RepoNode = {
+  id: string;
+  nameWithOwner: string;
+  url: string;
+  description: string | null;
+  stargazerCount: number;
+  primaryLanguage: { name: string } | null;
+  defaultBranchRef: { name: string } | null;
+  pushedAt: string;
+  updatedAt: string;
+  isFork: boolean;
+} | null;
+
+async function fetchRepoDetails(
+  repoNodes: Map<string, string>,
+  deadline: number = Number.POSITIVE_INFINITY,
+): Promise<Map<string, RepoDetail>> {
   const entries = Array.from(repoNodes.entries());
-  const details = new Map();
+  const details = new Map<string, RepoDetail>();
   const document = `
     query($ids: [ID!]!) {
       nodes(ids: $ids) {
@@ -366,9 +456,9 @@ async function fetchRepoDetails(repoNodes, deadline = Number.POSITIVE_INFINITY) 
       break;
     }
     const batch = entries.slice(index, index + detailBatchSize);
-    let data;
+    let data: { nodes?: RepoNode[] };
     try {
-      data = await githubGraphql(document, { ids: batch.map(([, nodeId]) => nodeId) });
+      data = await githubGraphql<{ nodes?: RepoNode[] }>(document, { ids: batch.map(([, nodeId]) => nodeId) });
     } catch (error) {
       console.warn(`Skipping repository detail batch ${index}-${index + batch.length}: ${error}`);
       continue;
@@ -394,9 +484,11 @@ async function fetchRepoDetails(repoNodes, deadline = Number.POSITIVE_INFINITY) 
   return details;
 }
 
-async function main() {
+async function main(): Promise<void> {
   const overallStartedAt = Date.now();
-  const overallDeadline = scanMode === 'time-budget' ? overallStartedAt + scanMinutes * 60_000 - buildReserveSeconds * 1000 : Number.POSITIVE_INFINITY;
+  const overallDeadline = scanMode === 'time-budget'
+    ? overallStartedAt + scanMinutes * 60_000 - buildReserveSeconds * 1000
+    : Number.POSITIVE_INFINITY;
   const scan = scanMode === 'time-budget' ? await fetchTimeBudgetScan() : await fetchLimitedScan();
   const repoDetails = await fetchRepoDetails(scan.repoNodes, overallDeadline);
 
@@ -433,8 +525,8 @@ async function main() {
     repositories,
   };
 
-  await mkdir(new URL(`../${outputPath.split('/').slice(0, -1).join('/')}/`, import.meta.url), { recursive: true });
-  await writeFile(new URL(`../${outputPath}`, import.meta.url), `${JSON.stringify(payload, null, 2)}\n`);
+  const gitRoot = (await $`git rev-parse --show-toplevel`.text()).trim();
+  await Bun.write(`${gitRoot}/${outputPath}`, `${JSON.stringify(payload, null, 2)}\n`);
   console.log(`Wrote ${outputPath} with ${repositories.length} repositories`);
 }
 

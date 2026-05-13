@@ -6,9 +6,10 @@
   "packageManager": "pnpm@10.29.3",
   "scripts": {
     "dev": "vite dev --host 127.0.0.1",
-    "generate:data": "node scripts/generate-data.mjs",
+    "generate:data": "bun scripts/generate-data.ts",
     "build": "vite build && tsgo -b",
     "check": "tsgo -b --noEmit",
+    "check:scripts": "tsgo -p tsconfig.scripts.json --noEmit",
     "deploy": "pnpm build && wrangler deploy",
     "preview": "vite preview --host 127.0.0.1"
   },
@@ -28,6 +29,7 @@
     "tailwindcss": "^4.3.0"
   },
   "devDependencies": {
+    "@types/bun": "^1.3.0",
     "@types/node": "^25.7.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
