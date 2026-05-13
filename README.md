@@ -11,6 +11,7 @@ A static GitHub Pages app that lists public repositories whose workflow files co
 - Filters by primary language.
 - Shows matching workflow files for each repository.
 - Does not ask visitors for a GitHub token.
+- Builds a TanStack Start static-prerendered page for GitHub Pages.
 
 ## Data generation
 
@@ -67,8 +68,8 @@ pnpm dev
 pnpm build
 ```
 
-The Vite base path is configured for GitHub Pages at `/pages-github-pull-request-target/`.
+The Vite base path and TanStack Router basepath are configured for GitHub Pages at `/pages-github-pull-request-target/`. TanStack Start prerenders the root route into `dist/client/index.html` and copies the public JSON to `dist/client/data/repositories.json`.
 
 ## Deployment
 
-The `Deploy GitHub Pages` workflow builds the checked-in static data and deploys `dist/` to GitHub Pages on pushes to `main` and through manual dispatch. It does not refresh the repository index itself.
+The `Deploy GitHub Pages` workflow builds the checked-in static data and deploys `dist/client` to GitHub Pages on pushes to `main` and through manual dispatch. It does not refresh the repository index itself.

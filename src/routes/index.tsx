@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
-import { createRoot } from 'react-dom/client';
+import { createFileRoute } from '@tanstack/react-router';
 import { AlertTriangle, ArrowUpRight, CalendarClock, Code2, FileCode2, GitBranch, GitFork, Search, ShieldAlert, Sparkles, Star } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
-import './style.css';
+import staticData from '../../public/data/repositories.json';
 
 type RepoResult = {
   fullName: string;
@@ -172,23 +172,11 @@ function VirtualRepositoryList({ repositories }: VirtualRepositoryListProps) {
   );
 }
 
-function App() {
-  const [data, setData] = useState<StaticData | null>(null);
+function PullRequestTargetPage() {
+  const data = Route.useLoaderData();
   const [language, setLanguage] = useState('all');
   const [sortMode, setSortMode] = useState<SortMode>('stars-desc');
   const [textFilter, setTextFilter] = useState('');
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch(`${import.meta.env.BASE_URL}data/repositories.json`, { cache: 'no-cache' })
-      .then((response) => {
-        if (!response.ok) throw new Error(`Failed to load data: ${response.status}`);
-        return response.json() as Promise<StaticData>;
-      })
-      .then(setData)
-      .catch((caught) => setError(caught instanceof Error ? caught.message : String(caught)));
-  }, []);
-
   const repositories = data?.repositories ?? [];
 
   const languages = useMemo(() => {
@@ -288,14 +276,6 @@ function App() {
           </Card>
         </header>
 
-        {error ? (
-          <Card className="border-red-300/30 bg-red-950/40 text-red-100">
-            <CardContent className="flex gap-3 p-5">
-              <AlertTriangle className="h-5 w-5" />
-              <div><strong>Data load failed.</strong><br />{error}</div>
-            </CardContent>
-          </Card>
-        ) : null}
 
         <section className="grid min-w-0 gap-4 md:grid-cols-3">
           <MetricCard icon={<GitFork className="h-5 w-5" />} label="Repositories indexed" value={formatNumber(repositories.length)} description="Unique repos in this snapshot" />
@@ -344,4 +324,7 @@ function App() {
   );
 }
 
-createRoot(document.getElementById('root')!).render(<App />);
+export const Route = createFileRoute('/')({
+  loader: () => staticData as StaticData,
+  component: PullRequestTargetPage,
+});

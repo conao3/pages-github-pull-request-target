@@ -4,15 +4,17 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
+    "dev": "vite dev --host 127.0.0.1",
     "generate:data": "node scripts/generate-data.mjs",
-    "build": "tsc -b && vite build",
+    "build": "vite build && tsc -b",
     "check": "tsc -b --noEmit",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",
     "@tailwindcss/vite": "^4.3.0",
+    "@tanstack/react-router": "^1.169.2",
+    "@tanstack/react-start": "^1.167.65",
     "@tanstack/react-virtual": "^3.13.24",
     "@vitejs/plugin-react": "latest",
     "class-variance-authority": "^0.7.1",
@@ -22,12 +24,12 @@
     "react-dom": "latest",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.3.0",
-    "typescript": "latest",
-    "vite": "latest"
+    "typescript": "latest"
   },
   "devDependencies": {
     "@types/node": "^25.7.0",
     "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3"
+    "@types/react-dom": "^19.2.3",
+    "vite": "latest"
   }
 }
