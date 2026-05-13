@@ -38,6 +38,7 @@
               bun
               gh
               wrangler
+              lefthook
             ];
 
             shellHook = ''
@@ -51,6 +52,11 @@
               if [ ! -f node_modules/.pnpm/lock.yaml ] || [ pnpm-lock.yaml -nt node_modules/.pnpm/lock.yaml ]; then
                 echo "📦 Installing dependencies..."
                 pnpm install --frozen-lockfile
+              fi
+
+              # Install lefthook git hooks if they are missing or outdated
+              if [ -f lefthook.yaml ] && [ ! -f .git/hooks/pre-commit -o lefthook.yaml -nt .git/hooks/pre-commit ]; then
+                lefthook install >/dev/null
               fi
               '';
           };

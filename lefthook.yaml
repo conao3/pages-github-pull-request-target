@@ -1,0 +1,12 @@
+pre-commit:
+  parallel: true
+  jobs:
+    - name: format
+      run: pnpm format
+      stage_fixed: true
+
+pre-push:
+  parallel: true
+  jobs:
+    - name: check
+      run: pnpm check
