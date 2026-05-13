@@ -11,6 +11,8 @@
     "check": "pnpm \"/^check:/\"",
     "check:app": "tsgo -b --noEmit",
     "check:scripts": "tsgo -p tsconfig.scripts.json --noEmit",
+    "check:format": "oxfmt --check .",
+    "format": "oxfmt .",
     "deploy": "pnpm build && wrangler deploy",
     "preview": "vite preview --host 127.0.0.1"
   },
@@ -35,6 +37,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@typescript/native-preview": "7.0.0-dev.20260511.1",
+    "oxfmt": "^0.49.0",
     "vite": "^8.0.12"
   }
 }
