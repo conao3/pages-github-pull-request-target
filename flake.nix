@@ -26,21 +26,18 @@
     {
       devShells = forAllSystems (
         { pkgs }:
+        with pkgs;
         let
-          nodejs =
-            if pkgs ? nodejs_24 then
-              pkgs.nodejs_24
-            else
-              pkgs.nodejs;
+          nodejs = if pkgs ? nodejs_24 then nodejs_24 else pkgs.nodejs;
         in
         {
-          default = pkgs.mkShell {
+          default = mkShell {
             packages = [
               nodejs
-              pkgs.pnpm
-              pkgs.bun
-              pkgs.gh
-              pkgs.wrangler
+              pnpm
+              bun
+              gh
+              wrangler
             ];
 
             shellHook = ''
@@ -62,18 +59,19 @@
 
       apps = forAllSystems (
         { pkgs }:
+        with pkgs;
         let
           mkPnpmApp =
             name: args: {
               type = "app";
               program = toString (
-                pkgs.writeShellScript "pnpm-${name}" ''
+                writeShellScript "pnpm-${name}" ''
                   set -euo pipefail
-                  cd "$(${pkgs.git}/bin/git rev-parse --show-toplevel)"
+                  cd "$(${git}/bin/git rev-parse --show-toplevel)"
                   if [ ! -d node_modules ]; then
-                    ${pkgs.pnpm}/bin/pnpm install --frozen-lockfile
+                    ${pnpm}/bin/pnpm install --frozen-lockfile
                   fi
-                  exec ${pkgs.pnpm}/bin/pnpm ${args}
+                  exec ${pnpm}/bin/pnpm ${args}
                 ''
               );
             };
