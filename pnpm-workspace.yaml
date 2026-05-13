@@ -7,14 +7,6 @@ enablePrePostScripts: true
 
 minimumReleaseAge: 2880
 
-minimumReleaseAgeExclude:
-  - '@ryoppippi/vite-plugin-cloudflare-redirect'
-  - vitepress
-  - vitepress-plugin-group-icons
-  - vitepress-plugin-llms
-  - typedoc
-  - typedoc-plugin-markdown
-
 shellEmulator: true
 
 strictDepBuilds: true
