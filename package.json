@@ -8,7 +8,8 @@
     "dev": "vite dev --host 127.0.0.1",
     "generate:data": "bun scripts/generate-data.ts",
     "build": "vite build && tsgo -b",
-    "check": "tsgo -b --noEmit",
+    "check": "pnpm \"/^check:/\"",
+    "check:app": "tsgo -b --noEmit",
     "check:scripts": "tsgo -p tsconfig.scripts.json --noEmit",
     "deploy": "pnpm build && wrangler deploy",
     "preview": "vite preview --host 127.0.0.1"
