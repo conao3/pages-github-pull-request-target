@@ -48,8 +48,13 @@
 
               echo "Node.js $(node --version)"
               echo "pnpm $(pnpm --version)"
-              echo "Run: pnpm install --frozen-lockfile"
-            '';
+
+              # Install dependencies only if node_modules/.pnpm/lock.yaml is older than pnpm-lock.yaml
+              if [ ! -f node_modules/.pnpm/lock.yaml ] || [ pnpm-lock.yaml -nt node_modules/.pnpm/lock.yaml ]; then
+                echo "📦 Installing dependencies..."
+                pnpm install --frozen-lockfile
+              fi
+              '';
           };
         }
       );
