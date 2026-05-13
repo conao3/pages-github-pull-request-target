@@ -1,6 +1,6 @@
 #!/usr/bin/env nix
 /*
-#! nix shell --inputs-from . nixpkgs#bun nixpkgs#gh nixpkgs#pnpm -c bun
+#! nix shell --inputs-from .. nixpkgs#bun nixpkgs#gh nixpkgs#pnpm -c bun
 */
 
 import { $ } from 'bun';
