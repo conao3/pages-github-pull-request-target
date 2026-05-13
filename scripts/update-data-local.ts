@@ -9,21 +9,21 @@ const gitRoot = (await $`git rev-parse --show-toplevel`.text()).trim();
 $.cwd(gitRoot);
 
 const ghToken = await $`gh auth token`.nothrow().text();
-const githubToken = (process.env.GITHUB_TOKEN ?? ghToken).trim();
+const githubToken = (Bun.env.GITHUB_TOKEN ?? ghToken).trim();
 if (!githubToken) {
   console.error("GITHUB_TOKEN is required, or install/login GitHub CLI so 'gh auth token' works.");
   process.exit(1);
 }
 
-const minutes = process.argv[2] ?? process.env.SCAN_MINUTES ?? '10';
+const minutes = process.argv[2] ?? Bun.env.SCAN_MINUTES ?? '10';
 const env = {
   GITHUB_TOKEN: githubToken,
-  SCAN_MODE: process.env.SCAN_MODE ?? 'time-budget',
-  MAX_SEARCH_RESULTS: process.env.MAX_SEARCH_RESULTS ?? '1000',
-  OUTPUT_PATH: process.env.OUTPUT_PATH ?? 'public/data/repositories.json',
-  PAGE_BURST_SIZE: process.env.PAGE_BURST_SIZE ?? '5',
+  SCAN_MODE: Bun.env.SCAN_MODE ?? 'time-budget',
+  MAX_SEARCH_RESULTS: Bun.env.MAX_SEARCH_RESULTS ?? '1000',
+  OUTPUT_PATH: Bun.env.OUTPUT_PATH ?? 'public/data/repositories.json',
+  PAGE_BURST_SIZE: Bun.env.PAGE_BURST_SIZE ?? '5',
 };
-$.env({ ...process.env, ...env });
+$.env({ ...Bun.env, ...env });
 
 console.log(
   `Generating static data with SCAN_MODE=${env.SCAN_MODE} SCAN_MINUTES=${minutes} MAX_SEARCH_RESULTS=${env.MAX_SEARCH_RESULTS}`,

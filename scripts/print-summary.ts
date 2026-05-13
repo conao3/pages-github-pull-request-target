@@ -28,7 +28,7 @@ type RepositoryIndex = {
 };
 
 const gitRoot = (await $`git rev-parse --show-toplevel`.text()).trim();
-const relativePath = process.env.OUTPUT_PATH ?? 'public/data/repositories.json';
+const relativePath = Bun.env.OUTPUT_PATH ?? 'public/data/repositories.json';
 const data = (await Bun.file(`${gitRoot}/${relativePath}`).json()) as RepositoryIndex;
 
 console.log(

@@ -74,27 +74,27 @@ for (let index = 2; index < process.argv.length; index += 1) {
   if (inlineValue === undefined) index += 1;
 }
 
-const token = process.env.GITHUB_TOKEN;
+const token = Bun.env.GITHUB_TOKEN;
 const query =
-  process.env.SEARCH_QUERY ?? 'pull_request_target path:.github/workflows in:file -fork:true';
-const outputPath = process.env.OUTPUT_PATH ?? 'public/data/repositories.json';
+  Bun.env.SEARCH_QUERY ?? 'pull_request_target path:.github/workflows in:file -fork:true';
+const outputPath = Bun.env.OUTPUT_PATH ?? 'public/data/repositories.json';
 const pageSize = 100;
 const maxSearchResults =
-  process.env.MAX_SEARCH_RESULTS === 'all'
+  Bun.env.MAX_SEARCH_RESULTS === 'all'
     ? Number.POSITIVE_INFINITY
-    : Number(process.env.MAX_SEARCH_RESULTS ?? '1000');
-const scanMode = args.get('scan-mode') ?? process.env.SCAN_MODE ?? 'limited';
-const scanMinutes = Number(args.get('minutes') ?? process.env.SCAN_MINUTES ?? '10');
-const retryDelayMs = Number(process.env.RETRY_DELAY_MS ?? '65000');
-const retryAttempts = Number(process.env.RETRY_ATTEMPTS ?? '3');
-const searchDelayMs = Number(process.env.SEARCH_DELAY_MS ?? '0');
-const fetchTimeoutMs = Number(process.env.FETCH_TIMEOUT_MS ?? '30000');
-const detailBatchSize = Number(process.env.DETAIL_BATCH_SIZE ?? '100');
-const pageBurstSize = Number(process.env.PAGE_BURST_SIZE ?? '5');
+    : Number(Bun.env.MAX_SEARCH_RESULTS ?? '1000');
+const scanMode = args.get('scan-mode') ?? Bun.env.SCAN_MODE ?? 'limited';
+const scanMinutes = Number(args.get('minutes') ?? Bun.env.SCAN_MINUTES ?? '10');
+const retryDelayMs = Number(Bun.env.RETRY_DELAY_MS ?? '65000');
+const retryAttempts = Number(Bun.env.RETRY_ATTEMPTS ?? '3');
+const searchDelayMs = Number(Bun.env.SEARCH_DELAY_MS ?? '0');
+const fetchTimeoutMs = Number(Bun.env.FETCH_TIMEOUT_MS ?? '30000');
+const detailBatchSize = Number(Bun.env.DETAIL_BATCH_SIZE ?? '100');
+const pageBurstSize = Number(Bun.env.PAGE_BURST_SIZE ?? '5');
 const maxSearchResultsPerQuery = 1000;
-const rateLimitSafetyMs = Number(process.env.RATE_LIMIT_SAFETY_MS ?? '3500');
-const detailReserveSeconds = Number(process.env.DETAIL_RESERVE_SECONDS ?? '240');
-const buildReserveSeconds = Number(process.env.BUILD_RESERVE_SECONDS ?? '45');
+const rateLimitSafetyMs = Number(Bun.env.RATE_LIMIT_SAFETY_MS ?? '3500');
+const detailReserveSeconds = Number(Bun.env.DETAIL_RESERVE_SECONDS ?? '240');
+const buildReserveSeconds = Number(Bun.env.BUILD_RESERVE_SECONDS ?? '45');
 
 if (!token) {
   throw new Error('GITHUB_TOKEN is required. In GitHub Actions this is provided automatically.');
