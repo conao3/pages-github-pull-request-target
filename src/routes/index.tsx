@@ -265,7 +265,7 @@ function PullRequestTargetPage() {
             <div className="flex flex-wrap gap-3">
               <Button asChild className="rounded-full bg-white text-slate-950 hover:bg-slate-200">
                 <a href="https://github.com/conao3/pages-github-pull-request-target" target="_blank" rel="noreferrer">
-                  <GitFork className="h-4 w-4" /> View repository
+                  View on GitHub <ArrowUpRight className="h-4 w-4" />
                 </a>
               </Button>
               <Button asChild variant="outline" className="rounded-full border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white">
@@ -310,6 +310,33 @@ function PullRequestTargetPage() {
           </Card>
         </header>
 
+        <section className="grid min-w-0 gap-5 border-y border-white/10 py-6 sm:py-8 lg:grid-cols-[minmax(0,0.35fr)_minmax(0,0.65fr)] lg:gap-10">
+          <div className="min-w-0">
+            <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">Why?</h2>
+            <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
+              `pull_request_target` is useful, but it crosses a dangerous trust boundary.
+            </p>
+          </div>
+          <div className="grid min-w-0 gap-4 text-base leading-7 text-slate-300">
+            <p>
+              The trigger lets workflows respond to pull requests with permissions from the base repository. That can be convenient for labeling, commenting, or trusted automation, but it becomes risky when a workflow checks out or executes code influenced by an untrusted pull request.
+            </p>
+            <p>
+              This risk is not theoretical. StepSecurity documented the{' '}
+              <a className="font-medium text-cyan-100 underline-offset-4 hover:underline" href="https://www.stepsecurity.io/blog/hackerbot-claw-github-actions-exploitation" target="_blank" rel="noreferrer">
+                hackerbot-claw GitHub Actions exploitation campaign
+              </a>
+              , including `pull_request_target` Pwn Request patterns. TanStack later reported an{' '}
+              <a className="font-medium text-cyan-100 underline-offset-4 hover:underline" href="https://tanstack.com/blog/npm-supply-chain-compromise-postmortem" target="_blank" rel="noreferrer">
+                npm supply-chain compromise
+              </a>{' '}
+              involving an attack chain that included `pull_request_target`, cache poisoning, and OIDC token extraction.
+            </p>
+            <p>
+              This index exists to make that risk visible. Appearing here does not prove that a repository is exploitable, but it is a signal that the workflow deserves careful review. If you maintain one of these repositories, consider safer GitHub Actions designs that avoid `pull_request_target` or keep untrusted code away from privileged credentials.
+            </p>
+          </div>
+        </section>
 
         <section className="grid min-w-0 gap-4 md:grid-cols-3">
           <MetricCard icon={<GitFork className="h-5 w-5" />} label="Repositories indexed" value={formatNumber(repositories.length)} description="Unique repos in this snapshot" />

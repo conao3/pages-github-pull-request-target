@@ -40,6 +40,7 @@
               nodejs
               pkgs.pnpm
               pkgs.gh
+              pkgs.wrangler
             ];
 
             shellHook = ''

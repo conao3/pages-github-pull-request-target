@@ -4,7 +4,7 @@ import { routeTree } from './routeTree.gen';
 
 export function getRouter() {
   return createRouter({
-    basepath: '/pages-github-pull-request-target',
+    basepath: import.meta.env.BASE_URL.replace(/\/$/, ''),
     routeTree,
     scrollRestoration: true,
   });

@@ -9,6 +9,7 @@
     "generate:data": "node scripts/generate-data.mjs",
     "build": "vite build && tsc -b",
     "check": "tsc -b --noEmit",
+    "deploy": "pnpm build && wrangler deploy",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
