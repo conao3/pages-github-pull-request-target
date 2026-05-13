@@ -75,10 +75,24 @@
                 ''
               );
             };
+
+          mkBunScript = name: {
+            type = "app";
+            program = toString (
+              writeShellScript "bun-${name}" ''
+                set -euo pipefail
+                cd "$(${git}/bin/git rev-parse --show-toplevel)"
+                exec ${bun}/bin/bun scripts/${name}.ts "$@"
+              ''
+            );
+          };
         in
         {
           check = mkPnpmApp "check" "check";
           build = mkPnpmApp "build" "build";
+          generate-data = mkBunScript "generate-data";
+          print-summary = mkBunScript "print-summary";
+          update-data-local = mkBunScript "update-data-local";
         }
       );
     };
