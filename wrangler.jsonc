@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pages-github-pull-request-target",
+  "compatibility_date": "2026-05-13",
+  "workers_dev": false,
+  "assets": {
+    "directory": "./dist/client",
+    "not_found_handling": "single-page-application",
+  },
+  "routes": [
+    {
+      "pattern": "github-pull-request-target.sancode.dev",
+      "custom_domain": true,
+    },
+  ],
+}
