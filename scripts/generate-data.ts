@@ -413,14 +413,14 @@ async function fetchTimeBudgetScan(): Promise<Scan & { shards: ShardStat[] }> {
   const startedAt = Date.now();
   const deadline = startedAt + scanMinutes * 60_000;
   const searchDeadline = deadline - (detailReserveSeconds + buildReserveSeconds) * 1000;
-  const scan: Scan = {
-    filesByRepo: new Map(),
-    repoNodes: new Map(),
+  const scan = {
+    filesByRepo: new Map<string, FileEntry[]>(),
+    repoNodes: new Map<string, string>(),
     totalCount: 0,
     incompleteResults: false,
     searchRequestCount: 0,
     lastRateLimit: null,
-  };
+  } satisfies Scan;
   const shardStats: ShardStat[] = [];
 
   const effectiveSearchDeadline =
@@ -453,9 +453,10 @@ async function fetchTimeBudgetScan(): Promise<Scan & { shards: ShardStat[] }> {
     shardStats.push(stat);
   }
 
-  delete scan.lastRateLimit;
+  // Strip lastRateLimit so it never leaks into the serialised payload.
+  const { lastRateLimit: _lastRateLimit, ...scanWithoutRateLimit } = scan;
   return {
-    ...scan,
+    ...scanWithoutRateLimit,
     shards: shardStats,
     scanStartedAt: new Date(startedAt).toISOString(),
     scanElapsedSeconds: Math.round((Date.now() - startedAt) / 1000),
