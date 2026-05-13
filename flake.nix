@@ -39,6 +39,7 @@
             packages = [
               nodejs
               pkgs.pnpm
+              pkgs.bun
               pkgs.gh
               pkgs.wrangler
             ];
@@ -48,6 +49,7 @@
 
               echo "Node.js $(node --version)"
               echo "pnpm $(pnpm --version)"
+              echo "Bun $(bun --version)"
 
               # Install dependencies only if node_modules/.pnpm/lock.yaml is older than pnpm-lock.yaml
               if [ ! -f node_modules/.pnpm/lock.yaml ] || [ pnpm-lock.yaml -nt node_modules/.pnpm/lock.yaml ]; then
