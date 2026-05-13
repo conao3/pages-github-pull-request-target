@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { createFileRoute } from '@tanstack/react-router';
-import { AlertTriangle, ArrowUpRight, CalendarClock, Code2, FileCode2, GitBranch, GitFork, Search, ShieldAlert, Sparkles, Star } from 'lucide-react';
+import { AlertTriangle, ArrowUpRight, CalendarClock, ChevronDown, Code2, FileCode2, GitBranch, GitFork, Search, ShieldAlert, Sparkles, Star } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -310,33 +310,43 @@ function PullRequestTargetPage() {
           </Card>
         </header>
 
-        <section className="grid min-w-0 gap-5 border-y border-white/10 py-6 sm:py-8 lg:grid-cols-[minmax(0,0.35fr)_minmax(0,0.65fr)] lg:gap-10">
-          <div className="min-w-0">
-            <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">Why?</h2>
-            <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
-              `pull_request_target` is useful, but it crosses a dangerous trust boundary.
-            </p>
+        <details className="group min-w-0 border-y border-white/10 py-6 sm:py-8" open>
+          <summary className="grid cursor-pointer list-none gap-5 marker:hidden lg:grid-cols-[minmax(0,0.35fr)_minmax(0,0.65fr)] lg:gap-10 [&::-webkit-details-marker]:hidden">
+            <div className="min-w-0">
+              <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">Why?</h2>
+              <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
+                <code>pull_request_target</code> is useful, but it crosses a dangerous trust boundary.
+              </p>
+            </div>
+            <div className="flex min-w-0 items-start justify-between gap-4 text-sm font-medium text-cyan-100 lg:justify-end">
+              <span className="group-open:hidden">Expand context</span>
+              <span className="hidden group-open:inline">Collapse context</span>
+              <ChevronDown className="mt-0.5 h-4 w-4 transition-transform group-open:rotate-180" />
+            </div>
+          </summary>
+          <div className="mt-5 grid min-w-0 gap-5 lg:grid-cols-[minmax(0,0.35fr)_minmax(0,0.65fr)] lg:gap-10">
+            <div className="hidden lg:block" />
+            <div className="grid min-w-0 gap-4 text-base leading-7 text-slate-300">
+              <p>
+                The trigger lets workflows respond to pull requests with permissions from the base repository. That can be convenient for labeling, commenting, or trusted automation, but it becomes risky when a workflow checks out or executes code influenced by an untrusted pull request.
+              </p>
+              <p>
+                This risk is not theoretical. StepSecurity documented the{' '}
+                <a className="font-medium text-cyan-100 underline-offset-4 hover:underline" href="https://www.stepsecurity.io/blog/hackerbot-claw-github-actions-exploitation" target="_blank" rel="noreferrer">
+                  hackerbot-claw GitHub Actions exploitation campaign
+                </a>
+                , including <code>pull_request_target</code> Pwn Request patterns. In{' '}
+                <a className="font-medium text-cyan-100 underline-offset-4 hover:underline" href="https://tanstack.com/blog/npm-supply-chain-compromise-postmortem" target="_blank" rel="noreferrer">
+                  TanStack&apos;s postmortem
+                </a>{' '}
+                of the npm supply-chain compromise, the team described an attack chain that included <code>pull_request_target</code>, cache poisoning, and OIDC token extraction.
+              </p>
+              <p>
+                This index exists to make that risk visible. Appearing here does not prove that a repository is exploitable, but it is a signal that the workflow deserves careful review. If you maintain one of these repositories, consider safer GitHub Actions designs that avoid <code>pull_request_target</code> or keep untrusted code away from privileged credentials.
+              </p>
+            </div>
           </div>
-          <div className="grid min-w-0 gap-4 text-base leading-7 text-slate-300">
-            <p>
-              The trigger lets workflows respond to pull requests with permissions from the base repository. That can be convenient for labeling, commenting, or trusted automation, but it becomes risky when a workflow checks out or executes code influenced by an untrusted pull request.
-            </p>
-            <p>
-              This risk is not theoretical. StepSecurity documented the{' '}
-              <a className="font-medium text-cyan-100 underline-offset-4 hover:underline" href="https://www.stepsecurity.io/blog/hackerbot-claw-github-actions-exploitation" target="_blank" rel="noreferrer">
-                hackerbot-claw GitHub Actions exploitation campaign
-              </a>
-              , including `pull_request_target` Pwn Request patterns. TanStack later reported an{' '}
-              <a className="font-medium text-cyan-100 underline-offset-4 hover:underline" href="https://tanstack.com/blog/npm-supply-chain-compromise-postmortem" target="_blank" rel="noreferrer">
-                npm supply-chain compromise
-              </a>{' '}
-              involving an attack chain that included `pull_request_target`, cache poisoning, and OIDC token extraction.
-            </p>
-            <p>
-              This index exists to make that risk visible. Appearing here does not prove that a repository is exploitable, but it is a signal that the workflow deserves careful review. If you maintain one of these repositories, consider safer GitHub Actions designs that avoid `pull_request_target` or keep untrusted code away from privileged credentials.
-            </p>
-          </div>
-        </section>
+        </details>
 
         <section className="grid min-w-0 gap-4 md:grid-cols-3">
           <MetricCard icon={<GitFork className="h-5 w-5" />} label="Repositories indexed" value={formatNumber(repositories.length)} description="Unique repos in this snapshot" />
