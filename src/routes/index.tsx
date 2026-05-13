@@ -310,7 +310,7 @@ function PullRequestTargetPage() {
           </Card>
         </header>
 
-        <details className="group min-w-0 border-y border-white/10 py-6 sm:py-8" open>
+        <details className="group min-w-0 border-y border-white/10 py-6 sm:py-8">
           <summary className="grid cursor-pointer list-none gap-5 marker:hidden lg:grid-cols-[minmax(0,0.35fr)_minmax(0,0.65fr)] lg:gap-10 [&::-webkit-details-marker]:hidden">
             <div className="min-w-0">
               <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">Why?</h2>
