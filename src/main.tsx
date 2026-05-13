@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { createRoot } from 'react-dom/client';
 import { AlertTriangle, ArrowUpRight, CalendarClock, Code2, FileCode2, GitBranch, GitFork, Search, ShieldAlert, Sparkles, Star } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -131,50 +132,42 @@ type VirtualRepositoryListProps = {
 };
 
 const VIRTUAL_OVERSCAN = 6;
-const DESKTOP_ROW_HEIGHT = 356;
-const MOBILE_ROW_HEIGHT = 456;
+const ESTIMATED_ROW_HEIGHT = 356;
 
 function VirtualRepositoryList({ repositories }: VirtualRepositoryListProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const [viewport, setViewport] = useState({ height: 900, width: 1280, scrollY: 0 });
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const rowVirtualizer = useWindowVirtualizer({
+    count: repositories.length,
+    estimateSize: () => ESTIMATED_ROW_HEIGHT,
+    overscan: VIRTUAL_OVERSCAN,
+    scrollMargin: listRef.current?.offsetTop ?? 0,
+    getItemKey: (index) => repositories[index]?.fullName ?? index,
+  });
 
-  useEffect(() => {
-    let frame = 0;
-    const updateViewport = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        setViewport({ height: window.innerHeight, width: window.innerWidth, scrollY: window.scrollY });
-      });
-    };
-
-    updateViewport();
-    window.addEventListener('scroll', updateViewport, { passive: true });
-    window.addEventListener('resize', updateViewport);
-    return () => {
-      cancelAnimationFrame(frame);
-      window.removeEventListener('scroll', updateViewport);
-      window.removeEventListener('resize', updateViewport);
-    };
-  }, []);
-
-  const rowHeight = viewport.width < 640 ? MOBILE_ROW_HEIGHT : DESKTOP_ROW_HEIGHT;
-  const containerTop = containerRef.current ? containerRef.current.getBoundingClientRect().top + viewport.scrollY : 0;
-  const rawStartIndex = Math.floor((viewport.scrollY - containerTop) / rowHeight) - VIRTUAL_OVERSCAN;
-  const startIndex = Math.max(0, Math.min(repositories.length, rawStartIndex));
-  const visibleCount = Math.ceil(viewport.height / rowHeight) + VIRTUAL_OVERSCAN * 2;
-  const endIndex = Math.min(repositories.length, startIndex + visibleCount);
-  const visibleRepositories = repositories.slice(startIndex, endIndex);
-  const totalHeight = repositories.length * rowHeight;
+  const virtualItems = rowVirtualizer.getVirtualItems();
 
   return (
-    <div ref={containerRef} className="relative min-w-0" style={{ height: totalHeight }}>
-      <div className="absolute inset-x-0 top-0 grid gap-4" style={{ transform: `translateY(${startIndex * rowHeight}px)` }}>
-        {visibleRepositories.map((repo) => (
-          <div key={repo.fullName} style={{ minHeight: rowHeight - 16 }}>
+    <div
+      ref={listRef}
+      className="relative min-w-0"
+      style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
+    >
+      {virtualItems.map((virtualItem) => {
+        const repo = repositories[virtualItem.index];
+        if (!repo) return null;
+
+        return (
+          <div
+            key={virtualItem.key}
+            ref={rowVirtualizer.measureElement}
+            data-index={virtualItem.index}
+            className="absolute inset-x-0 top-0 pb-4"
+            style={{ transform: `translateY(${virtualItem.start - rowVirtualizer.options.scrollMargin}px)` }}
+          >
             <RepositoryCard repo={repo} />
           </div>
-        ))}
-      </div>
+        );
+      })}
     </div>
   );
 }
