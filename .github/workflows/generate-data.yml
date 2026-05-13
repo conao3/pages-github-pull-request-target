@@ -58,11 +58,13 @@ jobs:
           token: ${{ github.token }}
       - uses: ./.github/actions/setup-nix
       - name: Generate static data
-        run: ./scripts/generate-data.ts --scan-mode "$SCAN_MODE" --minutes "$SCAN_MINUTES"
+        run: nix run .#generate-data -- --scan-mode "$SCAN_MODE" --minutes "$SCAN_MINUTES"
       - name: Print generated data summary
-        run: ./scripts/print-summary.ts
+        run: nix run .#print-summary
       - name: Commit generated data
         run: |
+          nix develop --command bash <<'EOF'
+          set -euo pipefail
           if git diff --quiet -- public/data/repositories.json; then
             echo "No repository index changes to commit."
             exit 0
@@ -73,3 +75,4 @@ jobs:
           git add public/data/repositories.json
           git commit -m "chore: update repository index"
           git push
+          EOF
