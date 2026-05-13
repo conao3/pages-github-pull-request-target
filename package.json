@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "packageManager": "pnpm@10.29.3",
   "scripts": {
     "dev": "vite dev --host 127.0.0.1",
     "generate:data": "node scripts/generate-data.mjs",
