@@ -4,8 +4,9 @@
 */
 
 import { $ } from 'bun';
+import { getGitRoot } from './_lib.ts';
 
-const gitRoot = (await $`git rev-parse --show-toplevel`.text()).trim();
+const gitRoot = await getGitRoot();
 $.cwd(gitRoot);
 
 const ghToken = await $`gh auth token`.nothrow().text();

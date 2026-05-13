@@ -3,7 +3,7 @@
 #! nix shell --inputs-from .. nixpkgs#bun -c bun
 */
 
-import { $ } from 'bun';
+import { getGitRoot } from './_lib.ts';
 
 type RateLimit = {
   limit: number;
@@ -606,7 +606,7 @@ async function main(): Promise<void> {
     repositories,
   };
 
-  const gitRoot = (await $`git rev-parse --show-toplevel`.text()).trim();
+  const gitRoot = await getGitRoot();
   await Bun.write(`${gitRoot}/${outputPath}`, `${JSON.stringify(payload, null, 2)}\n`);
   console.log(`Wrote ${outputPath} with ${repositories.length} repositories`);
 }

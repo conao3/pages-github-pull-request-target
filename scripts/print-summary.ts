@@ -3,7 +3,7 @@
 #! nix shell --inputs-from .. nixpkgs#bun -c bun
 */
 
-import { $ } from 'bun';
+import { getGitRoot } from './_lib.ts';
 
 type FileEntry = { path: string; url: string };
 
@@ -27,7 +27,7 @@ type RepositoryIndex = {
   repositories?: Repository[];
 };
 
-const gitRoot = (await $`git rev-parse --show-toplevel`.text()).trim();
+const gitRoot = await getGitRoot();
 const relativePath = Bun.env.OUTPUT_PATH ?? 'public/data/repositories.json';
 const data = (await Bun.file(`${gitRoot}/${relativePath}`).json()) as RepositoryIndex;
 
